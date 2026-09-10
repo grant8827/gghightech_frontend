@@ -8,14 +8,14 @@ export default function Home() {
       <section className="hero-glow relative overflow-hidden px-6 pb-24 pt-20 sm:pt-28">
         <div className="mx-auto max-w-4xl text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs text-zinc-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
+            <span className="h-1.5 w-1.5 rounded-full bg-accent" />
             Enterprise software & AI engineering
           </span>
 
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-6xl">
             We build the platforms
             <br />
-            your business <span className="text-cyan-400">runs on</span>
+            your business <span className="text-accent">runs on</span>
           </h1>
 
           <p className="mx-auto mt-6 max-w-2xl text-base text-zinc-400 sm:text-lg">
@@ -27,7 +27,7 @@ export default function Home() {
           <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
             <Link
               href="/estimate"
-              className="rounded-full bg-cyan-400 px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-105"
+              className="rounded-full bg-accent px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-105"
             >
               Get an Instant Estimate
             </Link>
@@ -61,7 +61,7 @@ export default function Home() {
           </p>
           <Link
             href="/estimate"
-            className="mt-8 inline-block rounded-full bg-cyan-400 px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-105"
+            className="mt-8 inline-block rounded-full bg-accent px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-105"
           >
             Build Your Estimate
           </Link>

@@ -168,7 +168,7 @@ export default function AdminPage() {
 
       {error && <p className="mb-6 rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-300">{error}</p>}
       {notice && (
-        <p className="mb-6 rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-3 text-sm text-cyan-200">{notice}</p>
+        <p className="mb-6 rounded-lg border border-accent/30 bg-accent/10 p-3 text-sm text-accent-light">{notice}</p>
       )}
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
@@ -188,7 +188,7 @@ export default function AdminPage() {
                   onClick={() => setSelectedOrgId(o.id)}
                   className={`w-full rounded-lg border px-3 py-2 text-left text-sm ${
                     selectedOrgId === o.id
-                      ? "border-cyan-400 bg-cyan-400/10 text-white"
+                      ? "border-accent bg-accent/10 text-white"
                       : "border-white/10 text-zinc-300 hover:border-white/30"
                   }`}
                 >
@@ -299,7 +299,7 @@ export default function AdminPage() {
                       {scope.project_type?.replace(/_/g, " ")} · {scope.design_tier}
                     </span>
                   </div>
-                  <div className="text-sm text-cyan-300">
+                  <div className="text-sm text-accent-light">
                     ${est.calculated_min_price.toLocaleString()} - $
                     {est.calculated_max_price.toLocaleString()}
                   </div>
@@ -317,7 +317,7 @@ export default function AdminPage() {
                       href={estimatePdfUrl(est.id)}
                       target="_blank"
                       rel="noreferrer"
-                      className="mt-3 inline-block text-xs text-cyan-300 underline"
+                      className="mt-3 inline-block text-xs text-accent-light underline"
                     >
                       View PDF proposal
                     </a>
@@ -358,7 +358,7 @@ function Input({
         value={value}
         required={required}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-cyan-400"
+        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-accent"
       />
     </label>
   );
@@ -368,7 +368,7 @@ function SubmitButton({ children }: { children: React.ReactNode }) {
   return (
     <button
       type="submit"
-      className="w-full rounded-lg bg-cyan-400 px-4 py-2 text-sm font-medium text-black transition-transform hover:scale-[1.01]"
+      className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black transition-transform hover:scale-[1.01]"
     >
       {children}
     </button>

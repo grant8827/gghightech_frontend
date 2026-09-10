@@ -91,7 +91,7 @@ export function PortfolioGrid() {
               onClick={() => setFilter(cat)}
               className={`rounded-full px-4 py-1.5 text-sm transition-colors ${
                 filter === cat
-                  ? "bg-cyan-400 text-black"
+                  ? "bg-accent text-black"
                   : "border border-white/10 text-zinc-300 hover:border-white/30"
               }`}
             >
@@ -108,10 +108,10 @@ export function PortfolioGrid() {
             onClick={() => setActive(cs)}
             className="glass-card group rounded-2xl p-6 text-left transition-transform hover:-translate-y-1"
           >
-            <span className="text-xs uppercase tracking-wide text-cyan-400">{cs.category}</span>
+            <span className="text-xs uppercase tracking-wide text-accent">{cs.category}</span>
             <h3 className="mt-2 text-lg font-medium text-white">{cs.title}</h3>
             <p className="mt-2 text-sm text-zinc-400">{cs.summary}</p>
-            <span className="mt-4 inline-block text-sm text-cyan-300 group-hover:underline">
+            <span className="mt-4 inline-block text-sm text-accent-light group-hover:underline">
               View Case Study →
             </span>
           </button>
@@ -137,7 +137,7 @@ function CaseStudyModal({ caseStudy, onClose }: { caseStudy: CaseStudy; onClose:
       >
         <div className="flex items-start justify-between">
           <div>
-            <span className="text-xs uppercase tracking-wide text-cyan-400">{caseStudy.category}</span>
+            <span className="text-xs uppercase tracking-wide text-accent">{caseStudy.category}</span>
             <h3 className="mt-1 text-xl font-semibold text-white">{caseStudy.title}</h3>
           </div>
           <button onClick={onClose} aria-label="Close" className="text-zinc-400 hover:text-white">

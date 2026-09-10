@@ -1,6 +1,7 @@
 "use client";
 
 import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
+import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -17,8 +18,16 @@ export function SiteNav({ clerkEnabled }: { clerkEnabled: boolean }) {
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-black/60 backdrop-blur-xl supports-[backdrop-filter]:bg-black/40">
       <nav className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-        <Link href="/" className="text-lg font-semibold tracking-tight text-white">
-          GG <span className="text-cyan-400">HighTech</span>
+        <Link href="/" className="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-white">
+          <Image
+            src="/gghightech-logo.jpg"
+            alt="GG HighTech"
+            width={36}
+            height={36}
+            className="rounded-full"
+            priority
+          />
+          GG <span className="text-accent">HighTech</span>
         </Link>
 
         <div className="hidden items-center gap-8 md:flex">
@@ -52,7 +61,7 @@ export function SiteNav({ clerkEnabled }: { clerkEnabled: boolean }) {
           )}
           <Link
             href="/estimate"
-            className="rounded-full bg-cyan-400 px-4 py-2 text-sm font-medium text-black transition-transform hover:scale-105"
+            className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-black transition-transform hover:scale-105"
           >
             Start a Project
           </Link>

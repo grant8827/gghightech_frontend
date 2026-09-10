@@ -161,7 +161,7 @@ export default function EstimatePage() {
               maxLength={4000}
               rows={5}
               placeholder="e.g. We need a customer portal where users can log in, view invoices, and message our support team. We also want it to sync with our existing inventory system…"
-              className="mt-3 w-full resize-y rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none focus:border-cyan-400"
+              className="mt-3 w-full resize-y rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none focus:border-accent"
             />
             <div className="mt-1 text-right text-xs text-zinc-600">{description.length}/4000</div>
           </fieldset>
@@ -178,7 +178,7 @@ export default function EstimatePage() {
                 setSavedEstimateId(null);
               }}
               placeholder="you@company.com"
-              className="mt-3 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none focus:border-cyan-400"
+              className="mt-3 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none focus:border-accent"
             />
           </fieldset>
 
@@ -187,13 +187,13 @@ export default function EstimatePage() {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full rounded-full bg-cyan-400 px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-[1.02] disabled:opacity-50"
+            className="w-full rounded-full bg-accent px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-[1.02] disabled:opacity-50"
           >
             {submitting ? "Submitting…" : "Save This Estimate"}
           </button>
 
           {savedEstimateId && (
-            <div className="rounded-lg border border-cyan-400/30 bg-cyan-400/10 p-4 text-sm text-cyan-200">
+            <div className="rounded-lg border border-accent/30 bg-accent/10 p-4 text-sm text-accent-light">
               Saved! Reference <span className="font-mono">{savedEstimateId.slice(0, 8)}</span>.{" "}
               <a
                 href={estimatePdfUrl(savedEstimateId)}
@@ -231,7 +231,7 @@ export default function EstimatePage() {
             )}
           </div>
 
-          {loading && <div className="mt-4 h-1 w-full animate-pulse rounded-full bg-cyan-400/40" />}
+          {loading && <div className="mt-4 h-1 w-full animate-pulse rounded-full bg-accent/40" />}
 
           <p className="mt-6 text-xs text-zinc-500">
             Non-binding, automatically calculated. A GG HighTech engineer confirms final scope
@@ -258,7 +258,7 @@ function OptionCard({
       onClick={onClick}
       className={`rounded-xl border px-4 py-3 text-left text-sm transition-colors ${
         selected
-          ? "border-cyan-400 bg-cyan-400/10 text-white"
+          ? "border-accent bg-accent/10 text-white"
           : "border-white/10 text-zinc-300 hover:border-white/30"
       }`}
     >

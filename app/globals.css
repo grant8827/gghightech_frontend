@@ -3,13 +3,20 @@
 :root {
   --background: #050505;
   --foreground: #f4f4f5;
-  --accent: #22d3ee;
+  /* Sampled directly from public/gghightech-logo.jpg (the "GG" gold
+     gradient) — see the color-extraction notes in the PR/commit that
+     introduced this. Keep these three in sync if the logo ever changes. */
+  --accent: #e8b84b; /* base gold — replaces the old cyan-400 everywhere */
+  --accent-light: #f5d98a; /* lighter gold — replaces cyan-300/cyan-200 */
+  --accent-dark: #8a5a17; /* deep gold/bronze shadow tone from the logo */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-accent: var(--accent);
+  --color-accent-light: var(--accent-light);
+  --color-accent-dark: var(--accent-dark);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -22,8 +29,8 @@ body {
 /* Ambient glow used behind the hero — see app/page.tsx */
 .hero-glow {
   background:
-    radial-gradient(600px circle at 20% 20%, rgba(34, 211, 238, 0.18), transparent 60%),
-    radial-gradient(500px circle at 80% 0%, rgba(168, 85, 247, 0.15), transparent 60%);
+    radial-gradient(600px circle at 20% 20%, rgba(232, 184, 75, 0.16), transparent 60%),
+    radial-gradient(500px circle at 80% 0%, rgba(138, 90, 23, 0.22), transparent 60%);
 }
 
 .glass-card {
