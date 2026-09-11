@@ -39,6 +39,7 @@ export default function EstimatePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [description, setDescription] = useState("");
   const [savedEstimateId, setSavedEstimateId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -73,6 +74,7 @@ export default function EstimatePage() {
         features,
         design_tier: designTier,
         client_email: email || undefined,
+        client_phone: phone || undefined,
         project_description: description || undefined,
       });
       setSavedEstimateId(estimate.id);
@@ -178,6 +180,20 @@ export default function EstimatePage() {
                 setSavedEstimateId(null);
               }}
               placeholder="you@company.com"
+              className="mt-3 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none focus:border-accent"
+            />
+          </fieldset>
+
+          <fieldset>
+            <legend className="text-sm font-medium text-zinc-300">Phone (optional)</legend>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setSavedEstimateId(null);
+              }}
+              placeholder="(555) 123-4567"
               className="mt-3 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none focus:border-accent"
             />
           </fieldset>

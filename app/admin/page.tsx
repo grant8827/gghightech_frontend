@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   ApiError,
+  clearAuth,
   createOrganization,
   createProject,
   estimatePdfUrl,
@@ -10,24 +11,129 @@ import {
   listEstimates,
   listOrganizations,
   listProjects,
+  loadAuth,
+  login,
+  saveAuth,
   type EstimateOut,
   type OrganizationOut,
   type ProjectOut,
+  type StoredAuth,
 } from "@/lib/api";
 
 // Roles mirrored from backend-fastapi/app/models/user.py USER_ROLES.
-const STAFF_ROLES = ["SUPER_ADMIN", "PROJECT_MANAGER", "LEAD_ENGINEER"];
 const CLIENT_ROLES = ["CLIENT_ADMIN", "CLIENT_VIEWER"];
 
 const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
 
 export default function AdminPage() {
-  // Dev-role fallback: stands in for a real signed-in user until Clerk is
-  // configured (see backend-fastapi/app/services/auth.py). Once
-  // NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is set, this whole switcher goes away
-  // and the real Clerk session token is sent instead — see lib/api.ts.
-  const [devRole, setDevRole] = useState("SUPER_ADMIN");
+  const [auth, setAuth] = useState<StoredAuth | null>(null);
+  const [checkedStorage, setCheckedStorage] = useState(false);
 
+  useEffect(() => {
+    // localStorage isn't available during SSR, so this can only be read
+    // client-side on mount — not synchronous app state, an external system.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setAuth(loadAuth());
+    setCheckedStorage(true);
+  }, []);
+
+  function handleLoggedIn(next: StoredAuth) {
+    saveAuth(next);
+    setAuth(next);
+  }
+
+  function handleLogout() {
+    clearAuth();
+    setAuth(null);
+  }
+
+  if (!checkedStorage) return null; // avoid a login-form flash before localStorage is read
+
+  if (!auth) {
+    return <LoginScreen onLoggedIn={handleLoggedIn} />;
+  }
+
+  return <AdminDashboard auth={auth} onSessionExpired={handleLogout} onLogout={handleLogout} />;
+}
+
+function LoginScreen({ onLoggedIn }: { onLoggedIn: (auth: StoredAuth) => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      const res = await login(email, password);
+      onLoggedIn({ token: res.access_token, role: res.role, email: res.email, full_name: res.full_name });
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not reach the API");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="mx-auto flex max-w-sm flex-col justify-center px-6 py-24">
+      <h1 className="text-2xl font-semibold text-white">Admin sign in</h1>
+      <p className="mt-1 text-sm text-zinc-400">GG HighTech staff only.</p>
+
+      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
+        <label className="block text-sm text-zinc-300">
+          Email
+          <input
+            type="email"
+            required
+            autoFocus
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-accent"
+          />
+        </label>
+        <label className="block text-sm text-zinc-300">
+          Password
+          <input
+            type="password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-accent"
+          />
+        </label>
+
+        {error && <p className="text-sm text-red-400">{error}</p>}
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black transition-transform hover:scale-[1.01] disabled:opacity-50"
+        >
+          {submitting ? "Signing in…" : "Sign in"}
+        </button>
+      </form>
+
+      {!clerkEnabled && (
+        <p className="mt-6 text-xs text-zinc-600">
+          This is the self-issued staff login (backend-fastapi/app/services/local_auth.py) — it
+          keeps working as a fallback even after Clerk is configured.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function AdminDashboard({
+  auth,
+  onSessionExpired,
+  onLogout,
+}: {
+  auth: StoredAuth;
+  onSessionExpired: () => void;
+  onLogout: () => void;
+}) {
   const [orgs, setOrgs] = useState<OrganizationOut[]>([]);
   const [projects, setProjects] = useState<ProjectOut[]>([]);
   const [estimates, setEstimates] = useState<EstimateOut[]>([]);
@@ -47,42 +153,54 @@ export default function AdminPage() {
   const [inviteName, setInviteName] = useState("");
   const [inviteRole, setInviteRole] = useState(CLIENT_ROLES[0]);
 
+  function handleError(e: unknown, fallback: string) {
+    if (e instanceof ApiError) {
+      if (e.status === 401) {
+        onSessionExpired();
+        return;
+      }
+      setError(`${e.status}: ${e.message}`);
+      return;
+    }
+    setError(fallback);
+  }
+
   async function refresh() {
     try {
       const [orgsRes, projectsRes, estimatesRes] = await Promise.all([
-        listOrganizations(devRole),
-        listProjects(devRole),
-        listEstimates(devRole),
+        listOrganizations(auth.token),
+        listProjects(auth.token),
+        listEstimates(auth.token),
       ]);
       setOrgs(orgsRes);
       setProjects(projectsRes);
       setEstimates(estimatesRes);
       setError(null);
     } catch (e) {
-      setError(e instanceof ApiError ? `${e.status}: ${e.message}` : "Could not reach the API");
+      handleError(e, "Could not reach the API");
     }
   }
 
   useEffect(() => {
-    // Fetch-on-mount/dep-change: refresh() sets state only after its awaits
-    // resolve, not synchronously within this effect body.
+    // Fetch-on-mount: refresh() sets state only after its awaits resolve,
+    // not synchronously within this effect body.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [devRole]);
+  }, []);
 
   async function handleCreateOrg(e: React.FormEvent) {
     e.preventDefault();
     setNotice(null);
     try {
-      const org = await createOrganization(devRole, { name: orgName, domain: orgDomain || undefined });
+      const org = await createOrganization(auth.token, { name: orgName, domain: orgDomain || undefined });
       setOrgName("");
       setOrgDomain("");
       setSelectedOrgId(org.id);
       setNotice(`Organization "${org.name}" created.`);
       refresh();
     } catch (e) {
-      setError(e instanceof ApiError ? `${e.status}: ${e.message}` : "Failed to create organization");
+      handleError(e, "Failed to create organization");
     }
   }
 
@@ -94,7 +212,7 @@ export default function AdminPage() {
       return;
     }
     try {
-      const project = await createProject(devRole, {
+      const project = await createProject(auth.token, {
         org_id: selectedOrgId,
         title: projectTitle,
         slug: projectSlug,
@@ -104,7 +222,7 @@ export default function AdminPage() {
       setNotice(`Project "${project.title}" created.`);
       refresh();
     } catch (e) {
-      setError(e instanceof ApiError ? `${e.status}: ${e.message}` : "Failed to create project");
+      handleError(e, "Failed to create project");
     }
   }
 
@@ -116,7 +234,7 @@ export default function AdminPage() {
       return;
     }
     try {
-      await inviteUser(devRole, {
+      await inviteUser(auth.token, {
         org_id: selectedOrgId,
         email: inviteEmail,
         full_name: inviteName,
@@ -126,7 +244,7 @@ export default function AdminPage() {
       setInviteName("");
       setNotice(`Invited ${inviteEmail}. (Email delivery is stubbed — see app/services/email.py.)`);
     } catch (e) {
-      setError(e instanceof ApiError ? `${e.status}: ${e.message}` : "Failed to invite user");
+      handleError(e, "Failed to invite user");
     }
   }
 
@@ -140,31 +258,18 @@ export default function AdminPage() {
           </p>
         </div>
 
-        {!clerkEnabled && (
-          <label className="flex items-center gap-2 rounded-full border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-xs text-amber-200">
-            Acting as
-            <select
-              value={devRole}
-              onChange={(e) => setDevRole(e.target.value)}
-              className="rounded bg-black/40 px-2 py-1 text-amber-100"
-            >
-              {[...STAFF_ROLES, ...CLIENT_ROLES].map((r) => (
-                <option key={r} value={r}>
-                  {r}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
+        <div className="flex items-center gap-3">
+          <span className="rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs text-accent-light">
+            {auth.full_name} · {auth.role}
+          </span>
+          <button
+            onClick={onLogout}
+            className="rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-300 hover:border-white/30"
+          >
+            Log out
+          </button>
+        </div>
       </div>
-
-      {!clerkEnabled && (
-        <p className="mb-6 text-xs text-zinc-500">
-          Clerk isn&apos;t configured yet, so this page uses the dev-auth header above instead of a
-          real sign-in. Fill in NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY / CLERK_SECRET_KEY (frontend) and
-          CLERK_* (backend) to switch to real auth.
-        </p>
-      )}
 
       {error && <p className="mb-6 rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-300">{error}</p>}
       {notice && (
@@ -295,6 +400,9 @@ export default function AdminPage() {
                     <span className="text-sm font-medium text-white">
                       {est.client_email ?? "No email given"}
                     </span>
+                    {est.client_phone && (
+                      <span className="ml-2 text-sm text-zinc-400">· {est.client_phone}</span>
+                    )}
                     <span className="ml-2 text-xs text-zinc-500">
                       {scope.project_type?.replace(/_/g, " ")} · {scope.design_tier}
                     </span>
