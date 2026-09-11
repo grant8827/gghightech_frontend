@@ -45,19 +45,19 @@ export function TrustedBy() {
         <p className="text-center text-xs font-medium uppercase tracking-widest text-zinc-500">
           Trusted By
         </p>
-      </div>
 
-      <div className="marquee-fade mt-8 overflow-hidden">
-        <div className="marquee-track flex w-max items-center gap-5">
-          {CLIENTS.map((client) => (
-            <LogoCard key={client.name} client={client} />
-          ))}
-          {/* Exact duplicate, hidden from assistive tech / keyboard nav —
-              the CSS animation scrolls exactly one set's width (-50%) so
-              this copy is what's visible sliding in behind the first. */}
-          {CLIENTS.map((client) => (
-            <LogoCard key={`${client.name}-dup`} client={client} hidden />
-          ))}
+        <div className="marquee-fade mt-8 overflow-hidden">
+          <div className="marquee-track flex w-max items-center gap-5">
+            {CLIENTS.map((client) => (
+              <LogoCard key={client.name} client={client} />
+            ))}
+            {/* Exact duplicate, hidden from assistive tech / keyboard nav —
+                the CSS animation scrolls exactly one set's width (-50%) so
+                this copy is what's visible sliding in behind the first. */}
+            {CLIENTS.map((client) => (
+              <LogoCard key={`${client.name}-dup`} client={client} hidden />
+            ))}
+          </div>
         </div>
       </div>
     </section>
