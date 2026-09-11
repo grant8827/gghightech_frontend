@@ -10,7 +10,7 @@ export function SiteNav({ clerkEnabled }: { clerkEnabled: boolean }) {
 
   const links = [
     { href: "/", label: "Home" },
-    { href: "/#portfolio", label: "Portfolio" },
+    { href: "/portfolio", label: "Portfolio" },
     { href: "/estimate", label: "Get an Estimate" },
     { href: "/admin", label: "Admin" },
   ];

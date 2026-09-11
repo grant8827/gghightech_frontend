@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { MetricCounter } from "@/components/MetricCounter";
-import { PortfolioGrid } from "@/components/PortfolioGrid";
+import { ServicesShowcase } from "@/components/ServicesShowcase";
 import { TrustedBy } from "@/components/TrustedBy";
 
 export default function Home() {
@@ -33,7 +33,7 @@ export default function Home() {
               Get an Instant Estimate
             </Link>
             <Link
-              href="#portfolio"
+              href="/portfolio"
               className="rounded-full border border-white/15 px-6 py-3 text-sm font-medium text-white transition-colors hover:border-white/40"
             >
               View Our Work
@@ -51,7 +51,7 @@ export default function Home() {
 
       <TrustedBy />
 
-      <PortfolioGrid />
+      <ServicesShowcase />
 
       <section className="border-t border-white/10 px-6 py-20">
         <div className="mx-auto max-w-3xl text-center">
