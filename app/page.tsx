@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MetricCounter } from "@/components/MetricCounter";
 import { PortfolioGrid } from "@/components/PortfolioGrid";
+import { TrustedBy } from "@/components/TrustedBy";
 
 export default function Home() {
   return (
@@ -47,6 +48,8 @@ export default function Home() {
           <MetricCounter value={24} suffix="/7" label="Staging visibility" />
         </div>
       </section>
+
+      <TrustedBy />
 
       <PortfolioGrid />
 
