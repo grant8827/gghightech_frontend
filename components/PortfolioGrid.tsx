@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 
-type Category = "Web" | "Mobile" | "AI" | "Enterprise";
+type Category = "Web" | "Mobile" | "Enterprise";
 
 type CaseStudy = {
   id: string;
@@ -11,60 +11,80 @@ type CaseStudy = {
   summary: string;
   metrics: { label: string; value: string }[];
   stack: string[];
+  url?: string;
 };
 
+// Real projects, not illustrative placeholders — see GGH team's engineering
+// background. Metrics here are factual scope descriptors, not performance
+// stats we don't have hard numbers for.
 const CASE_STUDIES: CaseStudy[] = [
   {
-    id: "client-portal",
-    title: "Realtime Client Portal",
-    category: "Enterprise",
-    summary:
-      "A live milestone tracker and staging sandbox that replaced weekly status emails with a self-serve dashboard.",
-    metrics: [
-      { label: "Support emails", value: "-62%" },
-      { label: "Time to first update", value: "< 1 day" },
-    ],
-    stack: ["Next.js", "FastAPI", "PostgreSQL", "WebSockets"],
-  },
-  {
-    id: "scope-estimator",
-    title: "Interactive Scope Estimator",
-    category: "AI",
-    summary:
-      "A rules-based pricing engine that turns feature toggles into an instant budget range and exportable PDF proposal.",
-    metrics: [
-      { label: "Quote turnaround", value: "Minutes" },
-      { label: "Qualified leads", value: "+40%" },
-    ],
-    stack: ["FastAPI", "React", "PDF export"],
-  },
-  {
-    id: "ecosystem-app",
-    title: "Cross-Platform Ecosystem",
-    category: "Mobile",
-    summary:
-      "Shared design system across a marketing site, client portal, and companion mobile app under one auth layer.",
-    metrics: [
-      { label: "Platforms", value: "3" },
-      { label: "Shared codebase", value: "70%" },
-    ],
-    stack: ["React Native", "Expo", "NativeWind"],
-  },
-  {
-    id: "back-office",
-    title: "Agency Back-Office Suite",
+    id: "radio-in-one-stop",
+    title: "Radio In One Stop",
     category: "Web",
     summary:
-      "Internal tooling for project creation, milestone tracking, and client onboarding in three steps.",
+      "A centralized digital streaming and broadcasting platform with low-latency live audio management, custom signal routing, and dynamic station control.",
     metrics: [
-      { label: "Onboarding steps", value: "3" },
-      { label: "Setup time", value: "-80%" },
+      { label: "Backend", value: "Go microservices" },
+      { label: "Streaming", value: "Low-latency live audio" },
     ],
-    stack: ["Next.js", "FastAPI", "RBAC"],
+    stack: ["Go", "React", "Microservices"],
+    url: "https://radioinonestop.com/",
+  },
+  {
+    id: "churchbooks-management",
+    title: "ChurchBooks Management",
+    category: "Enterprise",
+    summary:
+      "A multi-tenant accounting and management SaaS for churches — handling statutory deductions, regional tax compliance, and multi-user role permissions.",
+    metrics: [
+      { label: "Architecture", value: "Multi-tenant SaaS" },
+      { label: "Compliance", value: "Regional tax rules" },
+    ],
+    stack: ["Django", "Python", "PostgreSQL"],
+    url: "https://churchbooksmanagement.com/",
+  },
+  {
+    id: "rightfitgigs",
+    title: "RightFitGigs",
+    category: "Mobile",
+    summary:
+      "A job marketplace connecting gig workers and employers, with real-time alerts and candidate tracking across web and mobile.",
+    metrics: [
+      { label: "Platforms", value: "Web + iOS/Android" },
+      { label: "Realtime", value: "Alerts & tracking" },
+    ],
+    stack: [".NET Core", "React", "Flutter"],
+    url: "https://www.rightfitgigs.com/",
+  },
+  {
+    id: "safehaven-ehr",
+    title: "SafeHaven EHR System",
+    category: "Enterprise",
+    summary:
+      "A HIPAA-compliant medical portal with end-to-end encrypted patient authentication, secure records storage, and dynamic scheduling.",
+    metrics: [
+      { label: "Compliance", value: "HIPAA" },
+      { label: "Security", value: "End-to-end encryption" },
+    ],
+    stack: ["MongoDB", "Express", "React", "Node.js"],
+  },
+  {
+    id: "rentalhist",
+    title: "RentalHist",
+    category: "Web",
+    summary:
+      "A property data and CRM platform with automated listing syndication, lead tracking, and analytics dashboards — since extended with real-time multi-source property data integrations.",
+    metrics: [
+      { label: "Focus", value: "Listings & lead tracking" },
+      { label: "Integrations", value: "Multi-source property APIs" },
+    ],
+    stack: ["Laravel", "React", "PostgreSQL"],
+    url: "https://rentalhist.com/",
   },
 ];
 
-const CATEGORIES: ("All" | Category)[] = ["All", "Web", "Mobile", "AI", "Enterprise"];
+const CATEGORIES: ("All" | Category)[] = ["All", "Web", "Mobile", "Enterprise"];
 
 export function PortfolioGrid() {
   const [filter, setFilter] = useState<(typeof CATEGORIES)[number]>("All");
@@ -163,6 +183,17 @@ function CaseStudyModal({ caseStudy, onClose }: { caseStudy: CaseStudy; onClose:
             </span>
           ))}
         </div>
+
+        {caseStudy.url && (
+          <a
+            href={caseStudy.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-6 inline-block text-sm text-accent-light underline"
+          >
+            Visit live site →
+          </a>
+        )}
       </div>
     </div>
   );
