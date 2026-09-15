@@ -1,6 +1,5 @@
 // Thin fetch wrapper around the FastAPI backend (backend-fastapi/).
-// Every call goes through here so swapping in real Clerk bearer tokens
-// later (see the admin login helpers below) is a one-file change.
+// Every call goes through here so auth headers stay a one-file change.
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -33,11 +32,12 @@ async function request<T>(path: string, options: RequestInit & { token?: string 
   return res.json() as Promise<T>;
 }
 
-// ---- Admin login (GGH-401) ----
-// Real email/password login against backend-fastapi's self-issued JWT
-// (see app/services/local_auth.py) — this is what the SUPER_ADMIN account
-// created via `python -m app.cli create-superadmin` signs in with. Swapped
-// out for Clerk automatically once NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY is set.
+// ---- Login (GGH-401) ----
+// Email/password login against backend-fastapi's self-issued JWT (see
+// app/services/local_auth.py) — the site's only auth system. Used by both
+// /admin and /portal. New users get in via acceptInvite() below, not this
+// directly — invite_user() only creates the row; there's no password until
+// the invite link is followed.
 
 const AUTH_STORAGE_KEY = "gghightech_admin_auth";
 
@@ -54,6 +54,13 @@ export const login = (email: string, password: string) =>
   request<LoginResponse>("/api/v1/auth/login", {
     method: "POST",
     body: JSON.stringify({ email, password }),
+  });
+
+// Second half of the invite flow started by inviteUser() below.
+export const acceptInvite = (token: string, password: string) =>
+  request<LoginResponse>("/api/v1/auth/accept-invite", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
   });
 
 export function saveAuth(auth: StoredAuth): void {

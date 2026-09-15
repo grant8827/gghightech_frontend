@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { ApiError, login, type StoredAuth } from "@/lib/api";
 
-const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-
 // Shared by /admin and /portal — both authenticate the same way against
 // backend-fastapi's self-issued JWT (see lib/api.ts's login()), which works
 // for any role with a password_hash set, not just SUPER_ADMIN.
@@ -75,12 +73,11 @@ export function LoginScreen({
         </button>
       </form>
 
-      {!clerkEnabled && (
-        <p className="mt-6 text-xs text-zinc-600">
-          This is the self-issued login (backend-fastapi/app/services/local_auth.py) — it keeps
-          working as a fallback even after Clerk is configured.
-        </p>
-      )}
+      <p className="mt-6 text-xs text-zinc-600">
+        Self-issued login (backend-fastapi/app/services/local_auth.py). Invited a new user? They
+        need to follow the link emailed to them (see POST /auth/accept-invite) to set a password
+        before they can sign in here.
+      </p>
     </div>
   );
 }

@@ -1,17 +1,17 @@
 "use client";
 
-import { SignedIn, SignedOut, SignInButton, UserButton } from "@clerk/nextjs";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
 
-export function SiteNav({ clerkEnabled }: { clerkEnabled: boolean }) {
+export function SiteNav() {
   const [open, setOpen] = useState(false);
 
   const links = [
     { href: "/", label: "Home" },
     { href: "/portfolio", label: "Portfolio" },
     { href: "/estimate", label: "Get an Estimate" },
+    { href: "/portal", label: "Client Portal" },
     { href: "/admin", label: "Admin" },
   ];
 
@@ -43,22 +43,6 @@ export function SiteNav({ clerkEnabled }: { clerkEnabled: boolean }) {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          {clerkEnabled ? (
-            <>
-              <SignedOut>
-                <SignInButton mode="modal">
-                  <button className="text-sm text-zinc-300 hover:text-white">Sign in</button>
-                </SignInButton>
-              </SignedOut>
-              <SignedIn>
-                <UserButton />
-              </SignedIn>
-            </>
-          ) : (
-            <span className="rounded-full border border-amber-400/30 bg-amber-400/10 px-3 py-1 text-xs text-amber-300">
-              Auth not configured
-            </span>
-          )}
           <Link
             href="/estimate"
             className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-black transition-transform hover:scale-105"
