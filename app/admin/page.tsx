@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import {
   ApiError,
-  clearAuth,
   createOrganization,
   createProject,
   estimatePdfUrl,
@@ -11,117 +10,24 @@ import {
   listEstimates,
   listOrganizations,
   listProjects,
-  loadAuth,
-  login,
-  saveAuth,
   type EstimateOut,
   type OrganizationOut,
   type ProjectOut,
   type StoredAuth,
 } from "@/lib/api";
+import { AuthGate } from "@/components/AuthGate";
+import { Input, SubmitButton } from "@/components/LoginScreen";
 
 // Roles mirrored from backend-fastapi/app/models/user.py USER_ROLES.
 const CLIENT_ROLES = ["CLIENT_ADMIN", "CLIENT_VIEWER"];
 
-const clerkEnabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY);
-
 export default function AdminPage() {
-  const [auth, setAuth] = useState<StoredAuth | null>(null);
-  const [checkedStorage, setCheckedStorage] = useState(false);
-
-  useEffect(() => {
-    // localStorage isn't available during SSR, so this can only be read
-    // client-side on mount — not synchronous app state, an external system.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setAuth(loadAuth());
-    setCheckedStorage(true);
-  }, []);
-
-  function handleLoggedIn(next: StoredAuth) {
-    saveAuth(next);
-    setAuth(next);
-  }
-
-  function handleLogout() {
-    clearAuth();
-    setAuth(null);
-  }
-
-  if (!checkedStorage) return null; // avoid a login-form flash before localStorage is read
-
-  if (!auth) {
-    return <LoginScreen onLoggedIn={handleLoggedIn} />;
-  }
-
-  return <AdminDashboard auth={auth} onSessionExpired={handleLogout} onLogout={handleLogout} />;
-}
-
-function LoginScreen({ onLoggedIn }: { onLoggedIn: (auth: StoredAuth) => void }) {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setSubmitting(true);
-    setError(null);
-    try {
-      const res = await login(email, password);
-      onLoggedIn({ token: res.access_token, role: res.role, email: res.email, full_name: res.full_name });
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not reach the API");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   return (
-    <div className="mx-auto flex max-w-sm flex-col justify-center px-6 py-24">
-      <h1 className="text-2xl font-semibold text-white">Admin sign in</h1>
-      <p className="mt-1 text-sm text-zinc-400">GG HighTech staff only.</p>
-
-      <form onSubmit={handleSubmit} className="mt-8 space-y-4">
-        <label className="block text-sm text-zinc-300">
-          Email
-          <input
-            type="email"
-            required
-            autoFocus
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-accent"
-          />
-        </label>
-        <label className="block text-sm text-zinc-300">
-          Password
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-accent"
-          />
-        </label>
-
-        {error && <p className="text-sm text-red-400">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black transition-transform hover:scale-[1.01] disabled:opacity-50"
-        >
-          {submitting ? "Signing in…" : "Sign in"}
-        </button>
-      </form>
-
-      {!clerkEnabled && (
-        <p className="mt-6 text-xs text-zinc-600">
-          This is the self-issued staff login (backend-fastapi/app/services/local_auth.py) — it
-          keeps working as a fallback even after Clerk is configured.
-        </p>
+    <AuthGate title="Admin sign in" subtitle="GG HighTech staff only.">
+      {({ auth, onSessionExpired, onLogout }) => (
+        <AdminDashboard auth={auth} onSessionExpired={onSessionExpired} onLogout={onLogout} />
       )}
-    </div>
+    </AuthGate>
   );
 }
 
@@ -442,43 +348,5 @@ function AdminDashboard({
         </div>
       </div>
     </div>
-  );
-}
-
-function Input({
-  label,
-  value,
-  onChange,
-  required,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  required?: boolean;
-  type?: string;
-}) {
-  return (
-    <label className="block text-sm text-zinc-300">
-      {label}
-      <input
-        type={type}
-        value={value}
-        required={required}
-        onChange={(e) => onChange(e.target.value)}
-        className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white outline-none focus:border-accent"
-      />
-    </label>
-  );
-}
-
-function SubmitButton({ children }: { children: React.ReactNode }) {
-  return (
-    <button
-      type="submit"
-      className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black transition-transform hover:scale-[1.01]"
-    >
-      {children}
-    </button>
   );
 }

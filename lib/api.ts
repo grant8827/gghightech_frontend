@@ -151,6 +151,10 @@ export type ProjectOut = {
   health_score: number;
   staging_url: string | null;
   repository_url: string | null;
+  last_deploy_commit_sha: string | null;
+  last_deploy_status: string | null;
+  last_deployed_at: string | null;
+  overall_progress: number;
   created_at: string;
 };
 
@@ -167,6 +171,9 @@ export const createOrganization = (token: string, payload: { name: string; domai
 export const listProjects = (token: string, orgId?: string) =>
   request<ProjectOut[]>(`/api/v1/projects${orgId ? `?org_id=${orgId}` : ""}`, { token });
 
+export const getProject = (token: string, projectId: string) =>
+  request<ProjectOut>(`/api/v1/projects/${projectId}`, { token });
+
 export const createProject = (token: string, payload: { org_id: string; title: string; slug: string }) =>
   request<ProjectOut>("/api/v1/projects", {
     method: "POST",
@@ -174,7 +181,42 @@ export const createProject = (token: string, payload: { org_id: string; title: s
     token,
   });
 
+// GGH-302 — staff-only, recorded manually until a CI webhook exists.
+export const updateProjectDeployment = (
+  token: string,
+  projectId: string,
+  payload: { commit_sha: string; status: string },
+) =>
+  request<ProjectOut>(`/api/v1/projects/${projectId}/deployment`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    token,
+  });
+
 export const listEstimates = (token: string) => request<EstimateOut[]>("/api/v1/estimates", { token });
+
+// ---- Milestones / Portal (GGH-301) ----
+
+export type MilestoneOut = {
+  id: string;
+  project_id: string;
+  title: string;
+  progress_percentage: number;
+  status: string;
+  due_date: string | null;
+  created_at: string;
+};
+
+export const listMilestones = (token: string, projectId: string) =>
+  request<MilestoneOut[]>(`/api/v1/milestones?project_id=${projectId}`, { token });
+
+// GGH-301 — bare-signal live updates; browsers can't set custom headers on
+// a WebSocket, so the token travels as a query param instead. Callers should
+// treat any message as "something changed, refetch" rather than parse it.
+export const projectUpdatesSocketUrl = (token: string, projectId: string) => {
+  const wsUrl = API_URL.replace(/^http/, "ws");
+  return `${wsUrl}/api/v1/ws/projects/${projectId}?token=${encodeURIComponent(token)}`;
+};
 
 export const inviteUser = (
   token: string,
