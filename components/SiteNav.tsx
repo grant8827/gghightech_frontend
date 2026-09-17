@@ -12,8 +12,6 @@ export function SiteNav() {
     { href: "/services", label: "Services" },
     { href: "/portfolio", label: "Portfolio" },
     { href: "/estimate", label: "Get an Estimate" },
-    { href: "/portal", label: "Client Portal" },
-    { href: "/admin", label: "Admin" },
   ];
 
   return (
@@ -43,7 +41,10 @@ export function SiteNav() {
           ))}
         </div>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="hidden items-center gap-5 md:flex">
+          <Link href="/login" className="text-sm text-zinc-300 transition-colors hover:text-white">
+            Login
+          </Link>
           <Link
             href="/estimate"
             className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-black transition-transform hover:scale-105"
@@ -74,6 +75,9 @@ export function SiteNav() {
                 {l.label}
               </Link>
             ))}
+            <Link href="/login" className="text-sm text-zinc-300" onClick={() => setOpen(false)}>
+              Login
+            </Link>
           </div>
         </div>
       )}
