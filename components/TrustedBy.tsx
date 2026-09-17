@@ -14,6 +14,11 @@ const CLIENTS: Client[] = [
   { name: "RentalHist", logo: "/images/rentalhist-logo.png", url: "https://rentalhist.com/" },
   { name: "RightFitGigs", logo: "/images/rightfitgigs_logo.png", url: "https://www.rightfitgigs.com/" },
   { name: "Virtual Event Plus", logo: "/images/virtualeventplus.png", url: "https://www.virtualeventplus.com/" },
+  {
+    name: "Safe Haven Restoration Ministry",
+    logo: "/images/Safe%20haven%20restoration%20minitry-logo.png",
+    url: "/images/Safe%20haven%20restoration%20minitry-logo.png",
+  },
 ];
 
 function LogoCard({ client, hidden = false }: { client: Client; hidden?: boolean }) {

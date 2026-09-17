@@ -3,16 +3,26 @@
 import { useEffect, useState } from "react";
 import {
   ApiError,
+  createMilestone,
   createOrganization,
   createProject,
   estimatePdfUrl,
   inviteUser,
   listEstimates,
+  listInvoices,
+  listMilestones,
   listOrganizations,
   listProjects,
+  listProjectUpdates,
+  markInvoicePaid,
+  postProjectUpdate,
+  updateMilestone,
   type EstimateOut,
+  type InvoiceOut,
+  type MilestoneOut,
   type OrganizationOut,
   type ProjectOut,
+  type ProjectUpdateOut,
   type StoredAuth,
 } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
@@ -44,6 +54,7 @@ function AdminDashboard({
   const [projects, setProjects] = useState<ProjectOut[]>([]);
   const [estimates, setEstimates] = useState<EstimateOut[]>([]);
   const [expandedEstimateId, setExpandedEstimateId] = useState<string | null>(null);
+  const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -251,34 +262,35 @@ function AdminDashboard({
 
       <div className="mt-10">
         <h2 className="text-lg font-medium text-white">All projects</h2>
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-white/10">
-          <table className="w-full text-left text-sm">
-            <thead className="text-zinc-400">
-              <tr>
-                <th className="px-4 py-3">Title</th>
-                <th className="px-4 py-3">Slug</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Health</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projects.map((p) => (
-                <tr key={p.id} className="border-t border-white/10 text-zinc-200">
-                  <td className="px-4 py-3">{p.title}</td>
-                  <td className="px-4 py-3 text-zinc-400">{p.slug}</td>
-                  <td className="px-4 py-3">{p.status}</td>
-                  <td className="px-4 py-3">{p.health_score}</td>
-                </tr>
-              ))}
-              {projects.length === 0 && (
-                <tr>
-                  <td colSpan={4} className="px-4 py-6 text-center text-zinc-500">
-                    No projects yet.
-                  </td>
-                </tr>
+        <p className="mt-1 text-sm text-zinc-400">
+          Click a project to manage milestones, post team updates, and track invoices.
+        </p>
+        <div className="mt-4 space-y-3">
+          {projects.map((p) => (
+            <div key={p.id} className="glass-card rounded-xl p-4">
+              <button
+                onClick={() => setExpandedProjectId(expandedProjectId === p.id ? null : p.id)}
+                className="flex w-full flex-col gap-1 text-left sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <span className="text-sm font-medium text-white">{p.title}</span>
+                  <span className="ml-2 text-xs text-zinc-500">{p.slug}</span>
+                </div>
+                <div className="text-sm text-zinc-400">
+                  {p.status} · Health {p.health_score}
+                </div>
+              </button>
+
+              {expandedProjectId === p.id && (
+                <ProjectManagementPanel token={auth.token} project={p} onError={(e) => handleError(e, "Request failed")} />
               )}
-            </tbody>
-          </table>
+            </div>
+          ))}
+          {projects.length === 0 && (
+            <p className="rounded-xl border border-white/10 p-4 text-center text-sm text-zinc-500">
+              No projects yet.
+            </p>
+          )}
         </div>
       </div>
 
@@ -346,6 +358,268 @@ function AdminDashboard({
             </p>
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+const MILESTONE_STATUSES = ["PLANNED", "IN_PROGRESS", "COMPLETED"];
+
+type MilestoneDraft = { progress_percentage: string; amount: string; status: string };
+
+function ProjectManagementPanel({
+  token,
+  project,
+  onError,
+}: {
+  token: string;
+  project: ProjectOut;
+  onError: (e: unknown) => void;
+}) {
+  const [milestones, setMilestones] = useState<MilestoneOut[]>([]);
+  const [invoices, setInvoices] = useState<InvoiceOut[]>([]);
+  const [updates, setUpdates] = useState<ProjectUpdateOut[]>([]);
+  const [drafts, setDrafts] = useState<Record<string, MilestoneDraft>>({});
+  const [loading, setLoading] = useState(true);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const [newTitle, setNewTitle] = useState("");
+  const [newAmount, setNewAmount] = useState("");
+  const [updateMessage, setUpdateMessage] = useState("");
+
+  async function refresh() {
+    try {
+      const [m, i, u] = await Promise.all([
+        listMilestones(token, project.id),
+        listInvoices(token, project.id),
+        listProjectUpdates(token, project.id),
+      ]);
+      setMilestones(m);
+      setInvoices(i);
+      setUpdates(u);
+      setDrafts(
+        Object.fromEntries(
+          m.map((ms) => [
+            ms.id,
+            {
+              progress_percentage: String(ms.progress_percentage),
+              amount: ms.amount != null ? String(ms.amount) : "",
+              status: ms.status,
+            },
+          ]),
+        ),
+      );
+    } catch (e) {
+      onError(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id]);
+
+  async function handleSaveMilestone(id: string) {
+    const draft = drafts[id];
+    if (!draft) return;
+    setBusyId(id);
+    try {
+      await updateMilestone(token, id, {
+        progress_percentage: Number(draft.progress_percentage),
+        status: draft.status,
+        amount: draft.amount ? Number(draft.amount) : undefined,
+      });
+      await refresh();
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleCreateMilestone(e: React.FormEvent) {
+    e.preventDefault();
+    setBusyId("new");
+    try {
+      await createMilestone(token, {
+        project_id: project.id,
+        title: newTitle,
+        amount: newAmount ? Number(newAmount) : undefined,
+      });
+      setNewTitle("");
+      setNewAmount("");
+      await refresh();
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handlePostUpdate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!updateMessage.trim()) return;
+    setBusyId("update");
+    try {
+      await postProjectUpdate(token, project.id, updateMessage);
+      setUpdateMessage("");
+      await refresh();
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleMarkPaid(id: string) {
+    setBusyId(id);
+    try {
+      await markInvoicePaid(token, id);
+      await refresh();
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  if (loading) return <p className="mt-4 text-sm text-zinc-500">Loading…</p>;
+
+  return (
+    <div className="mt-4 space-y-6 border-t border-white/10 pt-4">
+      <div>
+        <h3 className="text-sm font-medium text-zinc-300">Milestones</h3>
+        <ul className="mt-2 space-y-2">
+          {milestones.map((m) => {
+            const draft = drafts[m.id] ?? { progress_percentage: "0", amount: "", status: m.status };
+            return (
+              <li
+                key={m.id}
+                className="flex flex-wrap items-center gap-2 rounded-lg border border-white/10 p-2 text-sm"
+              >
+                <span className="min-w-30 text-zinc-200">{m.title}</span>
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={draft.progress_percentage}
+                  onChange={(e) =>
+                    setDrafts((d) => ({ ...d, [m.id]: { ...draft, progress_percentage: e.target.value } }))
+                  }
+                  className="w-16 rounded border border-white/10 bg-white/5 px-2 py-1 text-white"
+                />
+                <span className="text-xs text-zinc-500">%</span>
+                <select
+                  value={draft.status}
+                  onChange={(e) => setDrafts((d) => ({ ...d, [m.id]: { ...draft, status: e.target.value } }))}
+                  className="rounded border border-white/10 bg-white/5 px-2 py-1 text-white"
+                >
+                  {MILESTONE_STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  placeholder="Amount $"
+                  value={draft.amount}
+                  onChange={(e) => setDrafts((d) => ({ ...d, [m.id]: { ...draft, amount: e.target.value } }))}
+                  className="w-24 rounded border border-white/10 bg-white/5 px-2 py-1 text-white"
+                />
+                <button
+                  onClick={() => handleSaveMilestone(m.id)}
+                  disabled={busyId === m.id}
+                  className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-black disabled:opacity-50"
+                >
+                  {busyId === m.id ? "…" : "Save"}
+                </button>
+                {m.approved_at && <span className="text-xs text-emerald-300">Approved</span>}
+              </li>
+            );
+          })}
+          {milestones.length === 0 && <p className="text-sm text-zinc-500">No milestones yet.</p>}
+        </ul>
+        <form onSubmit={handleCreateMilestone} className="mt-3 flex flex-wrap items-end gap-2">
+          <label className="text-xs text-zinc-400">
+            New milestone
+            <input
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              required
+              className="mt-1 block w-48 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400">
+            Amount $
+            <input
+              type="number"
+              value={newAmount}
+              onChange={(e) => setNewAmount(e.target.value)}
+              className="mt-1 block w-24 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={busyId === "new"}
+            className="rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-200 hover:border-accent/50 disabled:opacity-50"
+          >
+            {busyId === "new" ? "Adding…" : "Add"}
+          </button>
+        </form>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-medium text-zinc-300">Invoices</h3>
+        <ul className="mt-2 space-y-2">
+          {invoices.map((inv) => (
+            <li key={inv.id} className="flex items-center justify-between rounded-lg border border-white/10 p-2 text-sm">
+              <span className="text-zinc-200">
+                ${inv.amount.toLocaleString()} · {inv.status}
+              </span>
+              {inv.status === "PENDING" && (
+                <button
+                  onClick={() => handleMarkPaid(inv.id)}
+                  disabled={busyId === inv.id}
+                  className="rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-200 hover:border-accent/50 disabled:opacity-50"
+                >
+                  {busyId === inv.id ? "…" : "Mark Paid"}
+                </button>
+              )}
+            </li>
+          ))}
+          {invoices.length === 0 && <p className="text-sm text-zinc-500">No invoices yet.</p>}
+        </ul>
+      </div>
+
+      <div>
+        <h3 className="text-sm font-medium text-zinc-300">Post an update</h3>
+        <form onSubmit={handlePostUpdate} className="mt-2 flex flex-col gap-2">
+          <textarea
+            value={updateMessage}
+            onChange={(e) => setUpdateMessage(e.target.value)}
+            rows={2}
+            placeholder="e.g. Integrated Stripe payment webhooks for tier upgrades."
+            className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none focus:border-accent"
+          />
+          <button
+            type="submit"
+            disabled={busyId === "update"}
+            className="self-start rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-black disabled:opacity-50"
+          >
+            {busyId === "update" ? "Posting…" : "Post update"}
+          </button>
+        </form>
+        <ul className="mt-3 space-y-2">
+          {updates.map((u) => (
+            <li key={u.id} className="text-xs text-zinc-400">
+              <span className="text-zinc-300">{u.author_name}:</span> {u.message}
+            </li>
+          ))}
+        </ul>
       </div>
     </div>
   );

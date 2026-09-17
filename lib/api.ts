@@ -211,11 +211,34 @@ export type MilestoneOut = {
   progress_percentage: number;
   status: string;
   due_date: string | null;
+  amount: number | null;
+  approved_at: string | null;
   created_at: string;
 };
 
 export const listMilestones = (token: string, projectId: string) =>
   request<MilestoneOut[]>(`/api/v1/milestones?project_id=${projectId}`, { token });
+
+export const createMilestone = (
+  token: string,
+  payload: { project_id: string; title: string; due_date?: string; amount?: number },
+) =>
+  request<MilestoneOut>("/api/v1/milestones", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    token,
+  });
+
+export const updateMilestone = (
+  token: string,
+  milestoneId: string,
+  payload: { progress_percentage?: number; status?: string; due_date?: string; amount?: number },
+) =>
+  request<MilestoneOut>(`/api/v1/milestones/${milestoneId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    token,
+  });
 
 // GGH-301 — bare-signal live updates; browsers can't set custom headers on
 // a WebSocket, so the token travels as a query param instead. Callers should
@@ -224,6 +247,54 @@ export const projectUpdatesSocketUrl = (token: string, projectId: string) => {
   const wsUrl = API_URL.replace(/^http/, "ws");
   return `${wsUrl}/api/v1/ws/projects/${projectId}?token=${encodeURIComponent(token)}`;
 };
+
+// ---- Milestone approval / invoicing (Stripe stubbed) ----
+
+export type InvoiceOut = {
+  id: string;
+  org_id: string;
+  project_id: string;
+  milestone_id: string;
+  amount: number;
+  status: string;
+  created_at: string;
+  paid_at: string | null;
+};
+
+export const approveMilestone = (token: string, milestoneId: string) =>
+  request<InvoiceOut>(`/api/v1/milestones/${milestoneId}/approve`, { method: "POST", token });
+
+export const listInvoices = (token: string, projectId?: string) =>
+  request<InvoiceOut[]>(`/api/v1/invoices${projectId ? `?project_id=${projectId}` : ""}`, { token });
+
+export const invoicePdfUrl = (id: string) => `${API_URL}/api/v1/invoices/${id}/pdf`;
+
+export const payInvoice = (token: string, invoiceId: string) =>
+  request<{ checkout_url: string }>(`/api/v1/invoices/${invoiceId}/pay`, { method: "POST", token });
+
+export const markInvoicePaid = (token: string, invoiceId: string) =>
+  request<InvoiceOut>(`/api/v1/invoices/${invoiceId}/mark-paid`, { method: "PATCH", token });
+
+// ---- Architect status feed ----
+
+export type ProjectUpdateOut = {
+  id: string;
+  project_id: string;
+  author_name: string;
+  author_role: string;
+  message: string;
+  created_at: string;
+};
+
+export const listProjectUpdates = (token: string, projectId: string) =>
+  request<ProjectUpdateOut[]>(`/api/v1/projects/${projectId}/updates`, { token });
+
+export const postProjectUpdate = (token: string, projectId: string, message: string) =>
+  request<ProjectUpdateOut>(`/api/v1/projects/${projectId}/updates`, {
+    method: "POST",
+    body: JSON.stringify({ message }),
+    token,
+  });
 
 export const inviteUser = (
   token: string,

@@ -9,6 +9,7 @@ export function SiteNav() {
 
   const links = [
     { href: "/", label: "Home" },
+    { href: "/services", label: "Services" },
     { href: "/portfolio", label: "Portfolio" },
     { href: "/estimate", label: "Get an Estimate" },
     { href: "/portal", label: "Client Portal" },
