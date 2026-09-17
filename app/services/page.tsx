@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { ServicesGrid } from "@/components/ServicesGrid";
+import { TechStackRadar } from "@/components/TechStackRadar";
 
 export const metadata: Metadata = {
   title: "Services — GG HighTech",
@@ -8,5 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default function ServicesPage() {
-  return <ServicesGrid />;
+  return (
+    <>
+      <ServicesGrid />
+      <TechStackRadar />
+    </>
+  );
 }

@@ -161,6 +161,13 @@ export type ProjectOut = {
   last_deploy_commit_sha: string | null;
   last_deploy_status: string | null;
   last_deployed_at: string | null;
+  latest_commit_sha: string | null;
+  latest_commit_message: string | null;
+  latest_commit_synced_at: string | null;
+  jira_project_key: string | null;
+  jira_issue_count: number | null;
+  jira_done_count: number | null;
+  jira_synced_at: string | null;
   overall_progress: number;
   created_at: string;
 };
@@ -187,6 +194,36 @@ export const createProject = (token: string, payload: { org_id: string; title: s
     body: JSON.stringify(payload),
     token,
   });
+
+// Staff-only. Every field optional — only what's sent gets changed. This
+// is the only way to set staging_url and jira_project_key.
+export const updateProject = (
+  token: string,
+  projectId: string,
+  payload: Partial<{
+    title: string;
+    status: string;
+    budget_estimate: number;
+    staging_url: string;
+    repository_url: string;
+    jira_project_key: string;
+  }>,
+) =>
+  request<ProjectOut>(`/api/v1/projects/${projectId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    token,
+  });
+
+// Outbound polling — see backend-fastapi/app/services/github_service.py.
+// Unauthenticated calls already work for public repos.
+export const syncProjectGithub = (token: string, projectId: string) =>
+  request<ProjectOut>(`/api/v1/projects/${projectId}/sync-github`, { method: "POST", token });
+
+// Outbound polling — see backend-fastapi/app/services/jira_service.py.
+// 503s until JIRA_BASE_URL/JIRA_EMAIL/JIRA_API_TOKEN are all set server-side.
+export const syncProjectJira = (token: string, projectId: string) =>
+  request<ProjectOut>(`/api/v1/projects/${projectId}/sync-jira`, { method: "POST", token });
 
 // GGH-302 — staff-only, recorded manually until a CI webhook exists.
 export const updateProjectDeployment = (
@@ -254,7 +291,8 @@ export type InvoiceOut = {
   id: string;
   org_id: string;
   project_id: string;
-  milestone_id: string;
+  milestone_id: string | null;
+  description: string | null;
   amount: number;
   status: string;
   created_at: string;
@@ -266,6 +304,17 @@ export const approveMilestone = (token: string, milestoneId: string) =>
 
 export const listInvoices = (token: string, projectId?: string) =>
   request<InvoiceOut[]>(`/api/v1/invoices${projectId ? `?project_id=${projectId}` : ""}`, { token });
+
+// Staff-only, ad-hoc — not tied to a milestone (retainers, one-off charges).
+export const createInvoice = (
+  token: string,
+  payload: { project_id: string; amount: number; description: string },
+) =>
+  request<InvoiceOut>("/api/v1/invoices", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    token,
+  });
 
 export const invoicePdfUrl = (id: string) => `${API_URL}/api/v1/invoices/${id}/pdf`;
 

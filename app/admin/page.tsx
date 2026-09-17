@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   ApiError,
+  createInvoice,
   createMilestone,
   createOrganization,
   createProject,
@@ -16,7 +17,10 @@ import {
   listProjectUpdates,
   markInvoicePaid,
   postProjectUpdate,
+  syncProjectGithub,
+  syncProjectJira,
   updateMilestone,
+  updateProject,
   type EstimateOut,
   type InvoiceOut,
   type MilestoneOut,
@@ -282,7 +286,12 @@ function AdminDashboard({
               </button>
 
               {expandedProjectId === p.id && (
-                <ProjectManagementPanel token={auth.token} project={p} onError={(e) => handleError(e, "Request failed")} />
+                <ProjectManagementPanel
+                  token={auth.token}
+                  project={p}
+                  onError={(e) => handleError(e, "Request failed")}
+                  onProjectChanged={refresh}
+                />
               )}
             </div>
           ))}
@@ -371,11 +380,14 @@ function ProjectManagementPanel({
   token,
   project,
   onError,
+  onProjectChanged,
 }: {
   token: string;
   project: ProjectOut;
   onError: (e: unknown) => void;
+  onProjectChanged: () => void;
 }) {
+  const [projectDetail, setProjectDetail] = useState<ProjectOut>(project);
   const [milestones, setMilestones] = useState<MilestoneOut[]>([]);
   const [invoices, setInvoices] = useState<InvoiceOut[]>([]);
   const [updates, setUpdates] = useState<ProjectUpdateOut[]>([]);
@@ -386,6 +398,13 @@ function ProjectManagementPanel({
   const [newTitle, setNewTitle] = useState("");
   const [newAmount, setNewAmount] = useState("");
   const [updateMessage, setUpdateMessage] = useState("");
+
+  const [repoUrl, setRepoUrl] = useState(project.repository_url ?? "");
+  const [stagingUrl, setStagingUrl] = useState(project.staging_url ?? "");
+  const [jiraKey, setJiraKey] = useState(project.jira_project_key ?? "");
+  const [invoiceDescription, setInvoiceDescription] = useState("");
+  const [invoiceAmount, setInvoiceAmount] = useState("");
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   async function refresh() {
     try {
@@ -486,10 +505,154 @@ function ProjectManagementPanel({
     }
   }
 
+  async function handleSaveRepoSettings(e: React.FormEvent) {
+    e.preventDefault();
+    setBusyId("repo-settings");
+    setSyncMessage(null);
+    try {
+      const updated = await updateProject(token, project.id, {
+        repository_url: repoUrl || undefined,
+        staging_url: stagingUrl || undefined,
+        jira_project_key: jiraKey || undefined,
+      });
+      setProjectDetail(updated);
+      onProjectChanged();
+      setSyncMessage("Saved.");
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleSyncGithub() {
+    setBusyId("sync-github");
+    setSyncMessage(null);
+    try {
+      const updated = await syncProjectGithub(token, project.id);
+      setProjectDetail(updated);
+      onProjectChanged();
+      setSyncMessage(`Synced: ${updated.latest_commit_sha?.slice(0, 7)} — ${updated.latest_commit_message}`);
+    } catch (e) {
+      setSyncMessage(e instanceof ApiError ? e.message : "Could not reach the API");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleSyncJira() {
+    setBusyId("sync-jira");
+    setSyncMessage(null);
+    try {
+      const updated = await syncProjectJira(token, project.id);
+      setProjectDetail(updated);
+      onProjectChanged();
+      setSyncMessage(`Synced: ${updated.jira_done_count}/${updated.jira_issue_count} issues done`);
+    } catch (e) {
+      // Expected today: 503 "Jira isn't connected yet..." — shown plainly,
+      // same honesty standard as the portal's Stripe-stubbed "Pay" button.
+      setSyncMessage(e instanceof ApiError ? e.message : "Could not reach the API");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleCreateInvoice(e: React.FormEvent) {
+    e.preventDefault();
+    if (!invoiceDescription.trim() || !invoiceAmount) return;
+    setBusyId("new-invoice");
+    try {
+      await createInvoice(token, {
+        project_id: project.id,
+        amount: Number(invoiceAmount),
+        description: invoiceDescription,
+      });
+      setInvoiceDescription("");
+      setInvoiceAmount("");
+      await refresh();
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (loading) return <p className="mt-4 text-sm text-zinc-500">Loading…</p>;
 
   return (
     <div className="mt-4 space-y-6 border-t border-white/10 pt-4">
+      <div>
+        <h3 className="text-sm font-medium text-zinc-300">Repository &amp; Integrations</h3>
+        <form onSubmit={handleSaveRepoSettings} className="mt-2 flex flex-wrap items-end gap-2">
+          <label className="text-xs text-zinc-400">
+            Repository URL
+            <input
+              value={repoUrl}
+              onChange={(e) => setRepoUrl(e.target.value)}
+              placeholder="https://github.com/owner/repo"
+              className="mt-1 block w-56 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400">
+            Staging URL
+            <input
+              value={stagingUrl}
+              onChange={(e) => setStagingUrl(e.target.value)}
+              placeholder="https://staging.example.com"
+              className="mt-1 block w-56 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400">
+            Jira project key
+            <input
+              value={jiraKey}
+              onChange={(e) => setJiraKey(e.target.value)}
+              placeholder="ALPHA"
+              className="mt-1 block w-28 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={busyId === "repo-settings"}
+            className="rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-200 hover:border-accent/50 disabled:opacity-50"
+          >
+            {busyId === "repo-settings" ? "Saving…" : "Save"}
+          </button>
+        </form>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleSyncGithub}
+            disabled={busyId === "sync-github"}
+            className="rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-200 hover:border-accent/50 disabled:opacity-50"
+          >
+            {busyId === "sync-github" ? "Syncing…" : "Sync from GitHub"}
+          </button>
+          <button
+            onClick={handleSyncJira}
+            disabled={busyId === "sync-jira"}
+            className="rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-200 hover:border-accent/50 disabled:opacity-50"
+          >
+            {busyId === "sync-jira" ? "Syncing…" : "Sync from Jira"}
+          </button>
+          {syncMessage && <span className="text-xs text-zinc-400">{syncMessage}</span>}
+        </div>
+
+        <div className="mt-2 flex flex-wrap gap-4 text-xs text-zinc-500">
+          {projectDetail.latest_commit_sha && (
+            <span>
+              Latest commit: <code className="text-zinc-300">{projectDetail.latest_commit_sha.slice(0, 7)}</code>{" "}
+              {projectDetail.latest_commit_message}
+            </span>
+          )}
+          {projectDetail.jira_synced_at && (
+            <span>
+              Jira: {projectDetail.jira_done_count}/{projectDetail.jira_issue_count} issues done
+            </span>
+          )}
+        </div>
+      </div>
+
       <div>
         <h3 className="text-sm font-medium text-zinc-300">Milestones</h3>
         <ul className="mt-2 space-y-2">
@@ -579,6 +742,7 @@ function ProjectManagementPanel({
             <li key={inv.id} className="flex items-center justify-between rounded-lg border border-white/10 p-2 text-sm">
               <span className="text-zinc-200">
                 ${inv.amount.toLocaleString()} · {inv.status}
+                {inv.description && <span className="text-zinc-500"> — {inv.description}</span>}
               </span>
               {inv.status === "PENDING" && (
                 <button
@@ -593,6 +757,37 @@ function ProjectManagementPanel({
           ))}
           {invoices.length === 0 && <p className="text-sm text-zinc-500">No invoices yet.</p>}
         </ul>
+        <form onSubmit={handleCreateInvoice} className="mt-3 flex flex-wrap items-end gap-2">
+          <label className="text-xs text-zinc-400">
+            New invoice — for
+            <input
+              value={invoiceDescription}
+              onChange={(e) => setInvoiceDescription(e.target.value)}
+              placeholder="e.g. March 2026 retainer"
+              required
+              className="mt-1 block w-56 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400">
+            Amount $
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={invoiceAmount}
+              onChange={(e) => setInvoiceAmount(e.target.value)}
+              required
+              className="mt-1 block w-24 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={busyId === "new-invoice"}
+            className="rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-200 hover:border-accent/50 disabled:opacity-50"
+          >
+            {busyId === "new-invoice" ? "Creating…" : "Create invoice"}
+          </button>
+        </form>
       </div>
 
       <div>
