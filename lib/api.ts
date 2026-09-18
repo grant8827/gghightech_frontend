@@ -345,12 +345,105 @@ export const postProjectUpdate = (token: string, projectId: string, message: str
     token,
   });
 
+export type UserOut = {
+  id: string;
+  org_id: string;
+  email: string;
+  full_name: string;
+  role: string;
+  avatar_url: string | null;
+  created_at: string;
+};
+
 export const inviteUser = (
   token: string,
   payload: { org_id: string; email: string; full_name: string; role: string },
 ) =>
-  request<unknown>("/api/v1/users/invite", {
+  request<UserOut>("/api/v1/users/invite", {
     method: "POST",
     body: JSON.stringify(payload),
     token,
   });
+
+export const listUsers = (token: string) => request<UserOut[]>("/api/v1/users", { token });
+
+export const deleteUser = (token: string, userId: string) =>
+  request<void>(`/api/v1/users/${userId}`, { method: "DELETE", token });
+
+// ---- Jira ticket creation ----
+// Outbound only — writes a real issue into Jira via
+// backend-fastapi/app/services/jira_service.py's create_issue. 503s until
+// JIRA_BASE_URL/JIRA_EMAIL/JIRA_API_TOKEN are all set server-side, same as
+// syncProjectJira. This is a local record of tickets created *through this
+// tool*, not a live mirror of the project's Jira backlog.
+
+export type JiraTicketOut = {
+  id: string;
+  project_id: string;
+  org_id: string;
+  jira_issue_key: string;
+  jira_url: string;
+  summary: string;
+  description: string | null;
+  issue_type: string;
+  created_by_email: string | null;
+  created_at: string;
+};
+
+export const listJiraTickets = (token: string, projectId: string) =>
+  request<JiraTicketOut[]>(`/api/v1/projects/${projectId}/jira-tickets`, { token });
+
+export const createJiraTicket = (
+  token: string,
+  projectId: string,
+  payload: { summary: string; description: string; issue_type?: string },
+) =>
+  request<JiraTicketOut>(`/api/v1/projects/${projectId}/jira-tickets`, {
+    method: "POST",
+    body: JSON.stringify(payload),
+    token,
+  });
+
+// ---- Subscriptions / recurring billing plans ----
+// No scheduler behind these — generateSubscriptionInvoice creates one real
+// ad-hoc Invoice on demand, the same honest stopping point as the
+// Stripe-stubbed Pay button. See backend-fastapi/app/models/subscription_plan.py.
+
+export type SubscriptionPlanOut = {
+  id: string;
+  org_id: string;
+  project_id: string | null;
+  name: string;
+  amount: number;
+  billing_day: number;
+  status: string;
+  created_at: string;
+  last_invoiced_at: string | null;
+};
+
+export const listSubscriptionPlans = (token: string, orgId?: string) =>
+  request<SubscriptionPlanOut[]>(`/api/v1/subscriptions${orgId ? `?org_id=${orgId}` : ""}`, { token });
+
+export const createSubscriptionPlan = (
+  token: string,
+  payload: { org_id: string; project_id?: string; name: string; amount: number; billing_day: number },
+) =>
+  request<SubscriptionPlanOut>("/api/v1/subscriptions", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    token,
+  });
+
+export const updateSubscriptionPlan = (
+  token: string,
+  planId: string,
+  payload: Partial<{ name: string; amount: number; billing_day: number; status: string }>,
+) =>
+  request<SubscriptionPlanOut>(`/api/v1/subscriptions/${planId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    token,
+  });
+
+export const generateSubscriptionInvoice = (token: string, planId: string) =>
+  request<InvoiceOut>(`/api/v1/subscriptions/${planId}/generate-invoice`, { method: "POST", token });
