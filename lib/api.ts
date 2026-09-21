@@ -96,9 +96,26 @@ export type EstimateCreate = {
   design_tier: string;
   client_email?: string;
   client_phone?: string;
-  // Free-text "tell us exactly what you want" — reviewed by staff against
-  // the toggle-based price, not used in the calculation itself.
-  project_description?: string;
+  project_description: string;
+};
+
+export type InfrastructureCost = {
+  name: string;
+  monthly_min: number;
+  monthly_max: number;
+  annual_min: number;
+  annual_max: number;
+  note: string;
+};
+
+export type ScopeAnalysis = {
+  summary: string;
+  complexity: string;
+  adjustment_percent: number;
+  detected_requirements: string[];
+  risks: string[];
+  market_comparison: string;
+  source: "openai" | "rules";
 };
 
 export type EstimateOut = {
@@ -120,9 +137,14 @@ export type EstimatePreview = {
   calculated_max_price: number;
   estimated_weeks_min: number;
   estimated_weeks_max: number;
+  infrastructure: InfrastructureCost[];
+  monthly_operating_min: number;
+  monthly_operating_max: number;
+  first_year_operating_min: number;
+  first_year_operating_max: number;
 };
 
-export const previewEstimate = (payload: EstimateCreate) =>
+export const previewEstimate = (payload: Omit<EstimateCreate, "project_description">) =>
   request<EstimatePreview>("/api/v1/estimates/preview", {
     method: "POST",
     body: JSON.stringify(payload),
