@@ -10,6 +10,11 @@ import { Input, SubmitButton } from "@/components/LoginScreen";
 // org_id column is required either way.
 const STAFF_ROLES = ["LEAD_ENGINEER", "PROJECT_MANAGER", "SUPER_ADMIN"];
 
+const SUB_TABS = [
+  { id: "staff", label: "Staff" },
+  { id: "add", label: "Add Staff" },
+] as const;
+
 export function StaffTab({
   token,
   orgs,
@@ -25,6 +30,7 @@ export function StaffTab({
 }) {
   const internalOrg = orgs.find((o) => o.plan_tier === "INTERNAL");
 
+  const [subTab, setSubTab] = useState<(typeof SUB_TABS)[number]["id"]>("staff");
   const [users, setUsers] = useState<UserOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -82,74 +88,97 @@ export function StaffTab({
 
   const staff = users.filter((u) => STAFF_ROLES.includes(u.role));
 
-  if (loading) return <p className="text-sm text-zinc-500">Loading…</p>;
-
   return (
     <div>
       <h2 className="text-lg font-medium text-white">Staff</h2>
-      <p className="mt-1 text-sm text-zinc-400">Add developers and office staff — everyone who isn&apos;t a client.</p>
+      <p className="mt-1 text-sm text-zinc-400">Developers and office staff — everyone who isn&apos;t a client.</p>
 
-      {!internalOrg ? (
-        <p className="mt-6 max-w-md rounded-xl border border-white/10 p-4 text-sm text-zinc-500">
-          No internal organization found. Create one named e.g. &quot;GG HighTech (Internal)&quot; on the Clients
-          tab first — staff accounts are attached to it.
-        </p>
-      ) : (
-        <div className="glass-card mt-6 max-w-md rounded-2xl p-6">
-          <h3 className="text-sm font-medium text-white">Add staff member</h3>
-          <form onSubmit={handleInvite} className="mt-4 space-y-3">
-            <Input label="Full name" value={fullName} onChange={setFullName} required />
-            <Input label="Email" value={email} onChange={setEmail} required type="email" />
-            <label className="block text-sm text-zinc-300">
-              Role
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white"
-              >
-                {STAFF_ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <SubmitButton>{busyId === "new" ? "Sending…" : "Send invite"}</SubmitButton>
-          </form>
-          {notice && <p className="mt-3 text-xs text-accent-light">{notice}</p>}
+      <div className="mt-6 flex gap-2 border-b border-white/10">
+        {SUB_TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setSubTab(t.id)}
+            className={`-mb-px border-b-2 px-3 py-2 text-sm transition-colors ${
+              subTab === t.id
+                ? "border-accent text-accent-light"
+                : "border-transparent text-zinc-400 hover:text-zinc-200"
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {subTab === "staff" && (
+        <div className="mt-6">
+          {loading ? (
+            <p className="text-sm text-zinc-500">Loading…</p>
+          ) : (
+            <ul className="space-y-2">
+              {staff.map((u) => (
+                <li
+                  key={u.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 p-3 text-sm"
+                >
+                  <span className="text-zinc-200">
+                    <span className="text-white">{u.full_name}</span> · {u.email}
+                    <span className="ml-2 rounded-full bg-white/5 px-2 py-0.5 text-xs text-zinc-400">{u.role}</span>
+                  </span>
+                  {currentUserRole === "SUPER_ADMIN" && u.email !== currentUserEmail && (
+                    <button
+                      onClick={() => handleRemove(u.id)}
+                      disabled={busyId === u.id}
+                      className="rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-300 hover:border-red-400/50 disabled:opacity-50"
+                    >
+                      {busyId === u.id ? "…" : "Remove"}
+                    </button>
+                  )}
+                </li>
+              ))}
+              {staff.length === 0 && (
+                <p className="rounded-xl border border-white/10 p-4 text-center text-sm text-zinc-500">
+                  No staff added yet.
+                </p>
+              )}
+            </ul>
+          )}
         </div>
       )}
 
-      <div className="mt-8">
-        <h3 className="text-sm font-medium text-white">Current staff</h3>
-        <ul className="mt-3 space-y-2">
-          {staff.map((u) => (
-            <li
-              key={u.id}
-              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-white/10 p-3 text-sm"
-            >
-              <span className="text-zinc-200">
-                <span className="text-white">{u.full_name}</span> · {u.email}
-                <span className="ml-2 text-xs text-zinc-500">{u.role}</span>
-              </span>
-              {currentUserRole === "SUPER_ADMIN" && u.email !== currentUserEmail && (
-                <button
-                  onClick={() => handleRemove(u.id)}
-                  disabled={busyId === u.id}
-                  className="rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-300 hover:border-red-400/50 disabled:opacity-50"
-                >
-                  {busyId === u.id ? "…" : "Remove"}
-                </button>
-              )}
-            </li>
-          ))}
-          {staff.length === 0 && (
-            <p className="rounded-xl border border-white/10 p-4 text-center text-sm text-zinc-500">
-              No staff added yet.
+      {subTab === "add" && (
+        <div className="mt-6">
+          {!internalOrg ? (
+            <p className="max-w-md rounded-xl border border-white/10 p-4 text-sm text-zinc-500">
+              No internal organization found. Create one named e.g. &quot;GG HighTech (Internal)&quot; on the
+              Clients tab first — staff accounts are attached to it.
             </p>
+          ) : (
+            <div className="glass-card max-w-md rounded-2xl p-6">
+              <h3 className="text-sm font-medium text-white">Add staff member</h3>
+              <form onSubmit={handleInvite} className="mt-4 space-y-3">
+                <Input label="Full name" value={fullName} onChange={setFullName} required />
+                <Input label="Email" value={email} onChange={setEmail} required type="email" />
+                <label className="block text-sm text-zinc-300">
+                  Role
+                  <select
+                    value={role}
+                    onChange={(e) => setRole(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white"
+                  >
+                    {STAFF_ROLES.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <SubmitButton>{busyId === "new" ? "Sending…" : "Send invite"}</SubmitButton>
+              </form>
+              {notice && <p className="mt-3 text-xs text-accent-light">{notice}</p>}
+            </div>
           )}
-        </ul>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

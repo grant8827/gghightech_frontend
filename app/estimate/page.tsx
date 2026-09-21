@@ -11,6 +11,12 @@ import {
   type ScopeAnalysis,
 } from "@/lib/api";
 
+const REQUEST_TYPES = [
+  { id: "NEW", label: "New Project" },
+  { id: "UPDATE", label: "Update Existing Project" },
+  { id: "MAINTENANCE", label: "Maintain Project" },
+];
+
 const PROJECT_TYPES = [
   { id: "LANDING_PAGE", label: "Landing Page" },
   { id: "WEB_APPLICATION", label: "Web Application" },
@@ -32,6 +38,7 @@ const DESIGN_TIERS = [
 ];
 
 export default function EstimatePage() {
+  const [requestType, setRequestType] = useState(REQUEST_TYPES[0].id);
   const [projectType, setProjectType] = useState(PROJECT_TYPES[1].id);
   const [features, setFeatures] = useState<string[]>([]);
   const [designTier, setDesignTier] = useState(DESIGN_TIERS[0].id);
@@ -53,13 +60,13 @@ export default function EstimatePage() {
     const handle = setTimeout(() => {
       setError(null);
       setLoading(true);
-      previewEstimate({ project_type: projectType, features, design_tier: designTier })
+      previewEstimate({ project_type: projectType, features, design_tier: designTier, request_type: requestType })
         .then(setPreview)
         .catch((e) => setError(e instanceof ApiError ? e.message : "Could not reach the estimator"))
         .finally(() => setLoading(false));
     }, 200);
     return () => clearTimeout(handle);
-  }, [projectType, features, designTier]);
+  }, [projectType, features, designTier, requestType]);
 
   function toggleFeature(id: string) {
     setFeatures((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
@@ -75,6 +82,7 @@ export default function EstimatePage() {
         project_type: projectType,
         features,
         design_tier: designTier,
+        request_type: requestType,
         client_email: email || undefined,
         client_phone: phone || undefined,
         project_description: description,
@@ -82,6 +90,7 @@ export default function EstimatePage() {
       setSavedEstimate(estimate);
       const scope = estimate.scope_configuration as unknown as EstimatePreview;
       setPreview({
+        request_type: requestType,
         calculated_min_price: estimate.calculated_min_price,
         calculated_max_price: estimate.calculated_max_price,
         estimated_weeks_min: estimate.estimated_weeks_min,
@@ -91,6 +100,10 @@ export default function EstimatePage() {
         monthly_operating_max: scope.monthly_operating_max ?? 0,
         first_year_operating_min: scope.first_year_operating_min ?? 0,
         first_year_operating_max: scope.first_year_operating_max ?? 0,
+        maintenance_monthly_min: scope.maintenance_monthly_min ?? 0,
+        maintenance_monthly_max: scope.maintenance_monthly_max ?? 0,
+        maintenance_hours_per_week_min: scope.maintenance_hours_per_week_min ?? 0,
+        maintenance_hours_per_week_max: scope.maintenance_hours_per_week_max ?? 0,
       });
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not submit the estimate");
@@ -104,13 +117,30 @@ export default function EstimatePage() {
       <div className="mb-10">
         <h1 className="text-3xl font-semibold text-white sm:text-4xl">Build Your Estimate</h1>
         <p className="mt-2 max-w-xl text-sm text-zinc-400">
-          Choose a project type, the features you need, and a design tier — the budget range and
-          timeline update as you go.
+          Tell us whether it&apos;s a new build, an update to something you already have, or ongoing
+          maintenance — the pricing model updates as you go.
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-10 lg:grid-cols-[1.3fr_1fr]">
         <form onSubmit={handleSubmit} className="space-y-8">
+          <fieldset>
+            <legend className="text-sm font-medium text-zinc-300">Request type</legend>
+            <div role="radiogroup" className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              {REQUEST_TYPES.map((opt) => (
+                <OptionCard
+                  key={opt.id}
+                  label={opt.label}
+                  selected={requestType === opt.id}
+                  onClick={() => {
+                    setRequestType(opt.id);
+                    setSavedEstimate(null);
+                  }}
+                />
+              ))}
+            </div>
+          </fieldset>
+
           <fieldset>
             <legend className="text-sm font-medium text-zinc-300">Project type</legend>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -129,7 +159,13 @@ export default function EstimatePage() {
           </fieldset>
 
           <fieldset>
-            <legend className="text-sm font-medium text-zinc-300">Features</legend>
+            <legend className="text-sm font-medium text-zinc-300">
+              {requestType === "UPDATE"
+                ? "Features to update"
+                : requestType === "MAINTENANCE"
+                  ? "Features you use today"
+                  : "Features"}
+            </legend>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {FEATURES.map((opt) => (
                 <OptionCard
@@ -142,6 +178,7 @@ export default function EstimatePage() {
             </div>
           </fieldset>
 
+          {requestType !== "MAINTENANCE" && (
           <fieldset>
             <legend className="text-sm font-medium text-zinc-300">Design tier</legend>
             <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -158,6 +195,7 @@ export default function EstimatePage() {
               ))}
             </div>
           </fieldset>
+          )}
 
           <fieldset>
             <legend className="text-sm font-medium text-zinc-300">
@@ -256,28 +294,46 @@ export default function EstimatePage() {
         </form>
 
         <div className="glass-card h-fit rounded-2xl p-8 lg:sticky lg:top-24">
-          <div className="text-xs uppercase tracking-wide text-zinc-400">Estimated budget</div>
-          <div className="mt-2 text-3xl font-semibold text-white">
-            {preview ? (
-              <>
-                ${preview.calculated_min_price.toLocaleString()} - $
-                {preview.calculated_max_price.toLocaleString()}
-              </>
-            ) : (
-              <span className="text-zinc-500">Calculating…</span>
-            )}
-          </div>
+          {preview?.request_type === "MAINTENANCE" ? (
+            <>
+              <div className="text-xs uppercase tracking-wide text-zinc-400">Monthly retainer</div>
+              <div className="mt-2 text-3xl font-semibold text-white">
+                ${preview.maintenance_monthly_min.toLocaleString()} - $
+                {preview.maintenance_monthly_max.toLocaleString()}
+                <span className="text-base font-normal text-zinc-500"> / month</span>
+              </div>
 
-          <div className="mt-6 text-xs uppercase tracking-wide text-zinc-400">Estimated timeline</div>
-          <div className="mt-2 text-xl font-medium text-white">
-            {preview ? (
-              <>
-                {preview.estimated_weeks_min} - {preview.estimated_weeks_max} weeks
-              </>
-            ) : (
-              <span className="text-zinc-500">—</span>
-            )}
-          </div>
+              <div className="mt-6 text-xs uppercase tracking-wide text-zinc-400">Estimated involvement</div>
+              <div className="mt-2 text-xl font-medium text-white">
+                {preview.maintenance_hours_per_week_min} - {preview.maintenance_hours_per_week_max} hrs/week
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-xs uppercase tracking-wide text-zinc-400">Estimated budget</div>
+              <div className="mt-2 text-3xl font-semibold text-white">
+                {preview ? (
+                  <>
+                    ${preview.calculated_min_price.toLocaleString()} - $
+                    {preview.calculated_max_price.toLocaleString()}
+                  </>
+                ) : (
+                  <span className="text-zinc-500">Calculating…</span>
+                )}
+              </div>
+
+              <div className="mt-6 text-xs uppercase tracking-wide text-zinc-400">Estimated timeline</div>
+              <div className="mt-2 text-xl font-medium text-white">
+                {preview ? (
+                  <>
+                    {preview.estimated_weeks_min} - {preview.estimated_weeks_max} weeks
+                  </>
+                ) : (
+                  <span className="text-zinc-500">—</span>
+                )}
+              </div>
+            </>
+          )}
 
           {preview && preview.infrastructure.length > 0 && (
             <div className="mt-7 border-t border-white/10 pt-6">

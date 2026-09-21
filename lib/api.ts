@@ -94,6 +94,7 @@ export type EstimateCreate = {
   project_type: string;
   features: string[];
   design_tier: string;
+  request_type: string;
   client_email?: string;
   client_phone?: string;
   project_description: string;
@@ -133,6 +134,7 @@ export type EstimateOut = {
 };
 
 export type EstimatePreview = {
+  request_type: string;
   calculated_min_price: number;
   calculated_max_price: number;
   estimated_weeks_min: number;
@@ -142,6 +144,10 @@ export type EstimatePreview = {
   monthly_operating_max: number;
   first_year_operating_min: number;
   first_year_operating_max: number;
+  maintenance_monthly_min: number;
+  maintenance_monthly_max: number;
+  maintenance_hours_per_week_min: number;
+  maintenance_hours_per_week_max: number;
 };
 
 export const previewEstimate = (payload: Omit<EstimateCreate, "project_description">) =>

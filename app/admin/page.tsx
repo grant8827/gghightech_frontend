@@ -27,7 +27,6 @@ import { StaffTab } from "./tabs/StaffTab";
 const TABS = [
   { id: "overview", label: "Overview" },
   { id: "clients", label: "Clients" },
-  { id: "staff", label: "Staff" },
   { id: "projects", label: "Projects & Git" },
   { id: "jira", label: "Jira Tickets" },
   { id: "invoicing", label: "Invoicing" },
@@ -35,7 +34,12 @@ const TABS = [
   { id: "estimates", label: "Estimates" },
 ] as const;
 
-type TabId = (typeof TABS)[number]["id"];
+// Kept separate from TABS — rendered below the signed-in user's own badge
+// in the sidebar rather than in the main nav list, since staff management
+// is an account/access-control concern, not a delivery/billing one.
+const STAFF_TAB = { id: "staff", label: "Staff" } as const;
+
+type TabId = (typeof TABS)[number]["id"] | typeof STAFF_TAB.id;
 
 export default function AdminPage() {
   return (
@@ -163,6 +167,16 @@ function AdminDashboard({
           <span className="block rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-center text-xs text-accent-light">
             {auth.full_name} · {auth.role}
           </span>
+          <button
+            onClick={() => setActiveTab(STAFF_TAB.id)}
+            className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+              activeTab === STAFF_TAB.id
+                ? "bg-accent/15 text-accent-light"
+                : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+            }`}
+          >
+            {STAFF_TAB.label}
+          </button>
           <button
             onClick={onLogout}
             className="w-full rounded-full border border-white/10 px-3 py-1 text-xs text-zinc-300 hover:border-white/30"
