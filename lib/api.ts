@@ -313,7 +313,7 @@ export const projectUpdatesSocketUrl = (token: string, projectId: string) => {
   return `${wsUrl}/api/v1/ws/projects/${projectId}?token=${encodeURIComponent(token)}`;
 };
 
-// ---- Milestone approval / invoicing (Stripe stubbed) ----
+// ---- Milestone approval / invoicing (Stripe Checkout) ----
 
 export type InvoiceOut = {
   id: string;
@@ -433,9 +433,8 @@ export const createJiraTicket = (
   });
 
 // ---- Subscriptions / recurring billing plans ----
-// No scheduler behind these — generateSubscriptionInvoice creates one real
-// ad-hoc Invoice on demand, the same honest stopping point as the
-// Stripe-stubbed Pay button. See backend-fastapi/app/models/subscription_plan.py.
+// Plans can create a Stripe-hosted recurring Checkout link. Manual invoice
+// generation remains available for clients paying outside Stripe.
 
 export type SubscriptionPlanOut = {
   id: string;
@@ -475,3 +474,6 @@ export const updateSubscriptionPlan = (
 
 export const generateSubscriptionInvoice = (token: string, planId: string) =>
   request<InvoiceOut>(`/api/v1/subscriptions/${planId}/generate-invoice`, { method: "POST", token });
+
+export const createSubscriptionCheckout = (token: string, planId: string) =>
+  request<{ checkout_url: string }>(`/api/v1/subscriptions/${planId}/checkout`, { method: "POST", token });

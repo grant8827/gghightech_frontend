@@ -128,13 +128,9 @@ function ProjectDetail({ auth, onSessionExpired }: { auth: StoredAuth; onSession
     setNotice(null);
     setError(null);
     try {
-      await payInvoice(auth.token, invoiceId);
-      // Stripe is stubbed today — a real integration would redirect to
-      // checkout_url instead of reaching this line at all.
-      setNotice("Payment started.");
+      const { checkout_url } = await payInvoice(auth.token, invoiceId);
+      window.location.assign(checkout_url);
     } catch (e) {
-      // Expected today: 503 "Online payment isn't set up yet..." — shown
-      // plainly rather than pretending the payment went through.
       setError(e instanceof ApiError ? e.message : "Could not reach the API");
     } finally {
       setBusyId(null);

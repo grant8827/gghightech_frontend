@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import {
   ApiError,
   createSubscriptionPlan,
+  createSubscriptionCheckout,
   generateSubscriptionInvoice,
   listSubscriptionPlans,
   updateSubscriptionPlan,
@@ -27,6 +28,7 @@ export function PaymentsTab({
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [genMessage, setGenMessage] = useState<Record<string, string>>({});
+  const [checkoutLinks, setCheckoutLinks] = useState<Record<string, string>>({});
 
   const [orgId, setOrgId] = useState(orgs[0]?.id ?? "");
   const [projectId, setProjectId] = useState("");
@@ -102,6 +104,18 @@ export function PaymentsTab({
     }
   }
 
+  async function handleCheckoutLink(planId: string) {
+    setBusyId(planId);
+    try {
+      const result = await createSubscriptionCheckout(token, planId);
+      setCheckoutLinks((links) => ({ ...links, [planId]: result.checkout_url }));
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   function orgName(id: string) {
     return orgs.find((o) => o.id === id)?.name ?? "Unknown org";
   }
@@ -117,9 +131,8 @@ export function PaymentsTab({
     <div>
       <h2 className="text-lg font-medium text-white">Payments &amp; Subscriptions</h2>
       <p className="mt-1 text-sm text-zinc-400">
-        Recurring billing plans per client. There&apos;s no scheduler behind these yet — &quot;Generate this
-        month&apos;s invoice&quot; creates one real invoice on demand, same honest stopping point as the
-        Stripe-stubbed Pay button until a real Stripe account with recurring prices exists.
+        Create monthly plans and generate a secure Stripe enrollment link to send to the client.
+        Stripe collects the payment method and handles recurring charges.
       </p>
 
       <div className="glass-card mt-6 max-w-md rounded-2xl p-6">
@@ -221,6 +234,15 @@ export function PaymentsTab({
                 <div className="flex items-center gap-2">
                   {plan.status === "ACTIVE" && (
                     <button
+                      onClick={() => handleCheckoutLink(plan.id)}
+                      disabled={busyId === plan.id}
+                      className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-black disabled:opacity-50"
+                    >
+                      {busyId === plan.id ? "…" : "Create Stripe link"}
+                    </button>
+                  )}
+                  {plan.status === "ACTIVE" && (
+                    <button
                       onClick={() => handleGenerate(plan.id)}
                       disabled={busyId === plan.id}
                       className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-black disabled:opacity-50"
@@ -249,6 +271,20 @@ export function PaymentsTab({
                 </div>
               </div>
               {genMessage[plan.id] && <p className="mt-2 text-xs text-zinc-400">{genMessage[plan.id]}</p>}
+              {checkoutLinks[plan.id] && (
+                <div className="mt-2 flex items-center gap-3 text-xs">
+                  <a href={checkoutLinks[plan.id]} target="_blank" rel="noreferrer" className="text-accent-light underline">
+                    Open subscription checkout
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(checkoutLinks[plan.id])}
+                    className="text-zinc-400 hover:text-white"
+                  >
+                    Copy link
+                  </button>
+                </div>
+              )}
             </li>
           ))}
           {plans.length === 0 && (
