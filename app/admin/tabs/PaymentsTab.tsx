@@ -3,15 +3,25 @@
 import { useEffect, useState } from "react";
 import {
   ApiError,
-  createSubscriptionPlan,
+  createInvoice,
   createSubscriptionCheckout,
+  createSubscriptionPlan,
   generateSubscriptionInvoice,
   listSubscriptionPlans,
+  sendInvoicePaymentLink,
   updateSubscriptionPlan,
   type OrganizationOut,
   type ProjectOut,
   type SubscriptionPlanOut,
 } from "@/lib/api";
+
+const FREQUENCIES = [
+  { id: "ONE_TIME", label: "One-time" },
+  { id: "MONTHLY", label: "Monthly" },
+  { id: "ANNUAL", label: "Annual" },
+] as const;
+
+type Frequency = (typeof FREQUENCIES)[number]["id"];
 
 export function PaymentsTab({
   token,
@@ -30,11 +40,16 @@ export function PaymentsTab({
   const [genMessage, setGenMessage] = useState<Record<string, string>>({});
   const [checkoutLinks, setCheckoutLinks] = useState<Record<string, string>>({});
 
+  const [frequency, setFrequency] = useState<Frequency>("ONE_TIME");
+  const [subscribe, setSubscribe] = useState(false);
   const [orgId, setOrgId] = useState(orgs[0]?.id ?? "");
   const [projectId, setProjectId] = useState("");
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [billingDay, setBillingDay] = useState("1");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [createResult, setCreateResult] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const orgProjects = projects.filter((p) => p.org_id === orgId);
 
@@ -55,23 +70,51 @@ export function PaymentsTab({
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
-    if (!orgId || !name.trim() || !amount) return;
-    setBusyId("new-plan");
+    if (!orgId || !name.trim() || !amount || !customerEmail.trim()) return;
+    setCreating(true);
+    setCreateResult(null);
     try {
-      await createSubscriptionPlan(token, {
-        org_id: orgId,
-        project_id: projectId || undefined,
-        name,
-        amount: Number(amount),
-        billing_day: Number(billingDay),
-      });
+      if (frequency === "ONE_TIME") {
+        if (!projectId) {
+          onError(new Error("Select a project for a one-time charge"));
+          return;
+        }
+        const invoice = await createInvoice(token, {
+          project_id: projectId,
+          amount: Number(amount),
+          description: name,
+          customer_email: customerEmail,
+        });
+        const { checkout_url } = await sendInvoicePaymentLink(token, invoice.id);
+        setCreateResult(`Link sent to ${customerEmail}: ${checkout_url}`);
+      } else {
+        const isAnnual = frequency === "ANNUAL";
+        const isSubscription = isAnnual || subscribe;
+        const plan = await createSubscriptionPlan(token, {
+          org_id: orgId,
+          project_id: projectId || undefined,
+          name,
+          amount: Number(amount),
+          billing_frequency: frequency,
+          is_subscription: isSubscription,
+          billing_day: isSubscription ? undefined : Number(billingDay),
+          customer_email: customerEmail,
+        });
+        if (isSubscription) {
+          const { checkout_url } = await createSubscriptionCheckout(token, plan.id);
+          setCreateResult(`Link sent to ${customerEmail}: ${checkout_url}`);
+        } else {
+          setCreateResult(`Plan created — use "Generate this month's invoice" below when it's due.`);
+        }
+      }
       setName("");
       setAmount("");
+      setCustomerEmail("");
       await refresh();
     } catch (e) {
       onError(e);
     } finally {
-      setBusyId(null);
+      setCreating(false);
     }
   }
 
@@ -92,7 +135,12 @@ export function PaymentsTab({
     setGenMessage((m) => ({ ...m, [planId]: "" }));
     try {
       const invoice = await generateSubscriptionInvoice(token, planId);
-      setGenMessage((m) => ({ ...m, [planId]: `Invoice created: $${invoice.amount.toLocaleString()}` }));
+      setGenMessage((m) => ({
+        ...m,
+        [planId]: `Invoice created: $${invoice.amount.toLocaleString()}${
+          invoice.customer_email ? ` — link sent to ${invoice.customer_email}` : ""
+        }`,
+      }));
       await refresh();
     } catch (e) {
       setGenMessage((m) => ({
@@ -125,19 +173,56 @@ export function PaymentsTab({
     return projects.find((p) => p.id === id)?.title ?? "Unknown project";
   }
 
+  function planLabel(plan: SubscriptionPlanOut) {
+    const freq = plan.billing_frequency === "ANNUAL" ? "Annual" : "Monthly";
+    return `${freq} · ${plan.is_subscription ? "recurring" : "manual"}`;
+  }
+
   if (loading) return <p className="text-sm text-zinc-500">Loading…</p>;
 
   return (
     <div>
       <h2 className="text-lg font-medium text-white">Payments &amp; Subscriptions</h2>
       <p className="mt-1 text-sm text-zinc-400">
-        Create monthly plans and generate a secure Stripe enrollment link to send to the client.
-        Stripe collects the payment method and handles recurring charges.
+        One-time charges, annual pass-through costs, and monthly retainers — each creates a Stripe
+        Checkout link and emails it to the customer. Email delivery is stubbed (logged only) until a
+        real provider is configured — see app/services/email.py.
       </p>
 
       <div className="glass-card mt-6 max-w-md rounded-2xl p-6">
-        <h3 className="text-sm font-medium text-white">Create plan</h3>
-        <form onSubmit={handleCreate} className="mt-3 space-y-3">
+        <h3 className="text-sm font-medium text-white">Create a payment request</h3>
+
+        <div className="mt-3 flex gap-2">
+          {FREQUENCIES.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              onClick={() => {
+                setFrequency(f.id);
+                if (f.id !== "MONTHLY") setSubscribe(false);
+              }}
+              className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                frequency === f.id
+                  ? "border-accent bg-accent/10 text-white"
+                  : "border-white/10 text-zinc-300 hover:border-white/30"
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+
+        {frequency === "MONTHLY" && (
+          <label className="mt-3 flex items-center gap-2 text-sm text-zinc-300">
+            <input type="checkbox" checked={subscribe} onChange={(e) => setSubscribe(e.target.checked)} />
+            Set up as an auto-renewing subscription (charges automatically each month)
+          </label>
+        )}
+        {frequency === "ANNUAL" && (
+          <p className="mt-3 text-xs text-zinc-500">Annual charges always auto-renew each year.</p>
+        )}
+
+        <form onSubmit={handleCreate} className="mt-4 space-y-3">
           <label className="block text-sm text-zinc-300">
             Organization
             <select
@@ -156,7 +241,7 @@ export function PaymentsTab({
             </select>
           </label>
           <label className="block text-sm text-zinc-300">
-            Project (optional until you generate an invoice)
+            Project {frequency === "ONE_TIME" ? "" : "(optional)"}
             <select
               value={projectId}
               onChange={(e) => setProjectId(e.target.value)}
@@ -171,11 +256,22 @@ export function PaymentsTab({
             </select>
           </label>
           <label className="block text-sm text-zinc-300">
-            Plan name
+            {frequency === "ONE_TIME" ? "What's this for" : "Plan name"}
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Monthly retainer"
+              placeholder={frequency === "ONE_TIME" ? "e.g. Checkout bug fix" : "e.g. Monthly retainer"}
+              required
+              className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white"
+            />
+          </label>
+          <label className="block text-sm text-zinc-300">
+            Customer email
+            <input
+              type="email"
+              value={customerEmail}
+              onChange={(e) => setCustomerEmail(e.target.value)}
+              placeholder="client@company.com"
               required
               className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white"
             />
@@ -193,31 +289,38 @@ export function PaymentsTab({
                 className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white"
               />
             </label>
-            <label className="block w-28 text-sm text-zinc-300">
-              Billing day
-              <input
-                type="number"
-                min="1"
-                max="28"
-                value={billingDay}
-                onChange={(e) => setBillingDay(e.target.value)}
-                required
-                className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white"
-              />
-            </label>
+            {frequency === "MONTHLY" && !subscribe && (
+              <label className="block w-28 text-sm text-zinc-300">
+                Billing day
+                <input
+                  type="number"
+                  min="1"
+                  max="28"
+                  value={billingDay}
+                  onChange={(e) => setBillingDay(e.target.value)}
+                  required
+                  className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white"
+                />
+              </label>
+            )}
           </div>
           <button
             type="submit"
-            disabled={busyId === "new-plan" || orgs.length === 0}
+            disabled={creating || orgs.length === 0}
             className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-black transition-transform hover:scale-[1.01] disabled:opacity-50"
           >
-            {busyId === "new-plan" ? "Creating…" : "Create plan"}
+            {creating ? "Creating…" : "Create & send"}
           </button>
         </form>
+        {createResult && <p className="mt-3 text-xs text-accent-light">{createResult}</p>}
       </div>
 
       <div className="mt-8">
         <h3 className="text-sm font-medium text-white">Plans</h3>
+        <p className="mt-1 text-xs text-zinc-500">
+          Recurring (Annual, or Monthly with auto-renew) and manual monthly plans. One-time charges
+          aren&apos;t plans — they show up as invoices on the Invoicing tab.
+        </p>
         <ul className="mt-3 space-y-3">
           {plans.map((plan) => (
             <li key={plan.id} className="rounded-lg border border-white/10 p-3 text-sm">
@@ -227,21 +330,23 @@ export function PaymentsTab({
                   {projectTitle(plan.project_id)}
                   <br />
                   <span className="text-zinc-400">
-                    ${plan.amount.toLocaleString()}/mo on day {plan.billing_day} · {plan.status}
+                    ${plan.amount.toLocaleString()} · {planLabel(plan)}
+                    {plan.billing_day != null && ` on day ${plan.billing_day}`} · {plan.status}
+                    {plan.customer_email && ` · ${plan.customer_email}`}
                     {plan.last_invoiced_at && ` · last invoiced ${new Date(plan.last_invoiced_at).toLocaleDateString()}`}
                   </span>
                 </span>
                 <div className="flex items-center gap-2">
-                  {plan.status === "ACTIVE" && (
+                  {plan.status === "ACTIVE" && plan.is_subscription && (
                     <button
                       onClick={() => handleCheckoutLink(plan.id)}
                       disabled={busyId === plan.id}
                       className="rounded-full bg-accent px-3 py-1 text-xs font-medium text-black disabled:opacity-50"
                     >
-                      {busyId === plan.id ? "…" : "Create Stripe link"}
+                      {busyId === plan.id ? "…" : "Resend Stripe link"}
                     </button>
                   )}
-                  {plan.status === "ACTIVE" && (
+                  {plan.status === "ACTIVE" && !plan.is_subscription && (
                     <button
                       onClick={() => handleGenerate(plan.id)}
                       disabled={busyId === plan.id}

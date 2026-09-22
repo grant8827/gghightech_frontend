@@ -323,6 +323,7 @@ export type InvoiceOut = {
   description: string | null;
   amount: number;
   status: string;
+  customer_email: string | null;
   created_at: string;
   paid_at: string | null;
 };
@@ -336,7 +337,7 @@ export const listInvoices = (token: string, projectId?: string) =>
 // Staff-only, ad-hoc — not tied to a milestone (retainers, one-off charges).
 export const createInvoice = (
   token: string,
-  payload: { project_id: string; amount: number; description: string },
+  payload: { project_id: string; amount: number; description: string; customer_email?: string },
 ) =>
   request<InvoiceOut>("/api/v1/invoices", {
     method: "POST",
@@ -351,6 +352,16 @@ export const payInvoice = (token: string, invoiceId: string) =>
 
 export const markInvoicePaid = (token: string, invoiceId: string) =>
   request<InvoiceOut>(`/api/v1/invoices/${invoiceId}/mark-paid`, { method: "PATCH", token });
+
+// One-time payment path — this invoice is never a SubscriptionPlan. Staff-
+// initiated (unlike payInvoice above, which is the client's own self-serve
+// pay button): creates a Stripe Checkout session and emails the link to
+// the invoice's stored customer_email. Also callable again to resend.
+export const sendInvoicePaymentLink = (token: string, invoiceId: string) =>
+  request<{ checkout_url: string }>(`/api/v1/invoices/${invoiceId}/send-payment-link`, {
+    method: "POST",
+    token,
+  });
 
 // ---- Architect status feed ----
 
@@ -442,7 +453,10 @@ export type SubscriptionPlanOut = {
   project_id: string | null;
   name: string;
   amount: number;
-  billing_day: number;
+  billing_frequency: "MONTHLY" | "ANNUAL";
+  is_subscription: boolean;
+  billing_day: number | null;
+  customer_email: string | null;
   status: string;
   created_at: string;
   last_invoiced_at: string | null;
@@ -453,7 +467,16 @@ export const listSubscriptionPlans = (token: string, orgId?: string) =>
 
 export const createSubscriptionPlan = (
   token: string,
-  payload: { org_id: string; project_id?: string; name: string; amount: number; billing_day: number },
+  payload: {
+    org_id: string;
+    project_id?: string;
+    name: string;
+    amount: number;
+    billing_frequency: "MONTHLY" | "ANNUAL";
+    is_subscription: boolean;
+    billing_day?: number;
+    customer_email?: string;
+  },
 ) =>
   request<SubscriptionPlanOut>("/api/v1/subscriptions", {
     method: "POST",
@@ -464,7 +487,7 @@ export const createSubscriptionPlan = (
 export const updateSubscriptionPlan = (
   token: string,
   planId: string,
-  payload: Partial<{ name: string; amount: number; billing_day: number; status: string }>,
+  payload: Partial<{ name: string; amount: number; billing_day: number; customer_email: string; status: string }>,
 ) =>
   request<SubscriptionPlanOut>(`/api/v1/subscriptions/${planId}`, {
     method: "PATCH",
