@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ApiError,
   createEstimate,
   estimatePdfUrl,
-  previewEstimate,
   type EstimatePreview,
   type EstimateOut,
   type ScopeAnalysis,
@@ -44,7 +43,6 @@ export default function EstimatePage() {
   const [designTier, setDesignTier] = useState(DESIGN_TIERS[0].id);
 
   const [preview, setPreview] = useState<EstimatePreview | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [email, setEmail] = useState("");
@@ -56,24 +54,10 @@ export default function EstimatePage() {
   const descriptionWordCount = trimmedDescription ? trimmedDescription.split(/\s+/).length : 0;
   const descriptionReady = trimmedDescription.length >= 40 && descriptionWordCount >= 8;
 
-  // Live recalculation as inputs change (GGH-201 AC) — debounced against a
-  // stateless /estimates/preview call so we never spam the DB while the
-  // user is still toggling options.
-  useEffect(() => {
-    const handle = setTimeout(() => {
-      setError(null);
-      setLoading(true);
-      previewEstimate({ project_type: projectType, features, design_tier: designTier, request_type: requestType })
-        .then(setPreview)
-        .catch((e) => setError(e instanceof ApiError ? e.message : "Could not reach the estimator"))
-        .finally(() => setLoading(false));
-    }, 200);
-    return () => clearTimeout(handle);
-  }, [projectType, features, designTier, requestType]);
-
   function toggleFeature(id: string) {
     setFeatures((prev) => (prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]));
     setSavedEstimate(null);
+    setPreview(null);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -138,6 +122,7 @@ export default function EstimatePage() {
                   onClick={() => {
                     setRequestType(opt.id);
                     setSavedEstimate(null);
+                    setPreview(null);
                   }}
                 />
               ))}
@@ -155,6 +140,7 @@ export default function EstimatePage() {
                   onClick={() => {
                     setProjectType(opt.id);
                     setSavedEstimate(null);
+                    setPreview(null);
                   }}
                 />
               ))}
@@ -193,6 +179,7 @@ export default function EstimatePage() {
                   onClick={() => {
                     setDesignTier(opt.id);
                     setSavedEstimate(null);
+                    setPreview(null);
                   }}
                 />
               ))}
@@ -214,6 +201,7 @@ export default function EstimatePage() {
               onChange={(e) => {
                 setDescription(e.target.value);
                 setSavedEstimate(null);
+                setPreview(null);
               }}
               required
               minLength={40}
@@ -297,7 +285,7 @@ export default function EstimatePage() {
                 <p className="mt-3 text-sm leading-relaxed text-zinc-300">{analysis.summary}</p>
                 {analysis.detected_requirements.length > 0 && <p className="mt-3 text-xs text-zinc-400">Detected: {analysis.detected_requirements.join(" · ")}</p>}
                 <p className="mt-3 text-xs leading-relaxed text-zinc-500">{analysis.market_comparison}</p>
-                <p className="mt-3 text-xs text-accent-light">Complexity adjustment: +{analysis.adjustment_percent}% · {analysis.source === "openai" ? "AI evaluated" : "Rules evaluated"}</p>
+                <p className="mt-3 text-xs text-accent-light">{analysis.source === "openai" ? "Budget and timeline priced by AI" : "Fallback pricing rules used"} · Non-binding preliminary estimate</p>
               </div>
             ) : null;
           })()}
@@ -328,7 +316,7 @@ export default function EstimatePage() {
                     {preview.calculated_max_price.toLocaleString()}
                   </>
                 ) : (
-                  <span className="text-zinc-500">Calculating…</span>
+                  <span className="text-lg text-zinc-500">Complete the form for AI pricing</span>
                 )}
               </div>
 
@@ -363,8 +351,6 @@ export default function EstimatePage() {
               </div>
             </div>
           )}
-
-          {loading && <div className="mt-4 h-1 w-full animate-pulse rounded-full bg-accent/40" />}
 
           <p className="mt-6 text-xs text-zinc-500">
             Non-binding estimate. Development and recurring operating costs are shown separately.

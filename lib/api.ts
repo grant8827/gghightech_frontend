@@ -116,6 +116,14 @@ export type ScopeAnalysis = {
   detected_requirements: string[];
   risks: string[];
   market_comparison: string;
+  recommended_price_min: number;
+  recommended_price_max: number;
+  recommended_weeks_min: number;
+  recommended_weeks_max: number;
+  recommended_monthly_min: number;
+  recommended_monthly_max: number;
+  recommended_hours_per_week_min: number;
+  recommended_hours_per_week_max: number;
   source: "openai" | "rules";
 };
 
