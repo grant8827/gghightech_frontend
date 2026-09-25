@@ -52,6 +52,9 @@ export default function EstimatePage() {
   const [description, setDescription] = useState("");
   const [savedEstimate, setSavedEstimate] = useState<EstimateOut | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const trimmedDescription = description.trim();
+  const descriptionWordCount = trimmedDescription ? trimmedDescription.split(/\s+/).length : 0;
+  const descriptionReady = trimmedDescription.length >= 40 && descriptionWordCount >= 8;
 
   // Live recalculation as inputs change (GGH-201 AC) — debounced against a
   // stateless /estimates/preview call so we never spam the DB while the
@@ -219,7 +222,14 @@ export default function EstimatePage() {
               placeholder="e.g. We need a customer portal where users can log in, view invoices, and message our support team. We also want it to sync with our existing inventory system…"
               className="mt-3 w-full resize-y rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none focus:border-accent"
             />
-            <div className={`mt-1 text-right text-xs ${description.length > 0 && description.length < 40 ? "text-amber-400" : "text-zinc-600"}`}>{description.length}/4000 · minimum 40 characters</div>
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <span className={descriptionReady ? "text-accent-light" : description.length > 0 ? "text-amber-400" : "text-zinc-500"}>
+                {descriptionReady
+                  ? "Ready for AI analysis — click the button below."
+                  : "Enter at least 40 characters and 8 words to enable AI analysis."}
+              </span>
+              <span className="text-zinc-600">{description.length}/4000 · {descriptionWordCount} words</span>
+            </div>
           </fieldset>
 
           <fieldset>
@@ -256,10 +266,10 @@ export default function EstimatePage() {
 
           <button
             type="submit"
-            disabled={submitting || description.trim().length < 40}
+            disabled={submitting || !descriptionReady}
             className="w-full rounded-full bg-accent px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-[1.02] disabled:opacity-50"
           >
-            {submitting ? "Analyzing scope…" : "Analyze & Save Estimate"}
+            {submitting ? "AI is analyzing your scope…" : "Analyze with AI & Save Estimate"}
           </button>
 
           {savedEstimate && (
