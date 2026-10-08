@@ -255,7 +255,7 @@ export function PortfolioGrid() {
             })}
           </div>
 
-          <div className="mt-8 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-8 flex flex-col gap-5">
             {visible.map((project) => (
               <ProjectCard key={project.id} project={project} />
             ))}
@@ -303,9 +303,12 @@ export function PortfolioGrid() {
 function ProjectCard({ project }: { project: Project }) {
   const { links } = project;
 
+  // A list row: logo panel on the left, details in the middle, links on
+  // the right. Below `md` the three stack vertically; between `md` and
+  // `lg` the links drop under the details to keep the text column wide.
   return (
-    <article className="group flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] transition duration-300 hover:-translate-y-1 hover:border-accent/40 hover:shadow-[0_24px_60px_-24px_rgba(232,184,75,0.35)]">
-      <div className="relative flex h-44 items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(232,184,75,0.14),transparent_60%),#0f0e0b] px-8">
+    <article className="group flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.03] transition duration-300 hover:border-accent/40 hover:shadow-[0_24px_60px_-28px_rgba(232,184,75,0.35)] md:flex-row">
+      <div className="flex h-40 shrink-0 items-center justify-center bg-[radial-gradient(circle_at_30%_20%,rgba(232,184,75,0.14),transparent_60%),#0f0e0b] px-8 md:h-auto md:w-60 lg:w-72">
         {project.logo ? (
           <div className="relative h-24 w-full max-w-[220px] overflow-hidden rounded-2xl bg-white shadow-[0_12px_32px_rgba(0,0,0,0.45)] transition-transform duration-300 group-hover:scale-[1.03]">
             <Image
@@ -319,41 +322,45 @@ function ProjectCard({ project }: { project: Project }) {
         ) : (
           <Monogram name={project.name} />
         )}
-
-        <ul className="absolute left-4 top-4 flex gap-1.5" aria-label="Platforms">
-          {project.platforms.map((platform) => (
-            <li
-              key={platform}
-              className="rounded-full border border-white/15 bg-black/50 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-zinc-200 backdrop-blur"
-            >
-              {platform}
-            </li>
-          ))}
-        </ul>
-
-        {project.saas && (
-          <span className="absolute right-4 top-4 rounded-full border border-accent/40 bg-accent/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-accent-light backdrop-blur">
-            SaaS
-          </span>
-        )}
       </div>
 
-      <div className="flex flex-1 flex-col p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">{project.sector}</p>
-        <h2 className="mt-2 text-xl font-semibold tracking-tight text-white">{project.name}</h2>
-        <p className="mt-3 text-sm leading-relaxed text-zinc-400">{project.summary}</p>
+      <div className="flex flex-1 flex-col gap-6 p-6 lg:flex-row lg:items-center lg:gap-8 lg:p-8">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-accent">{project.sector}</p>
+            {project.saas && (
+              <span className="rounded-full border border-accent/40 bg-accent/15 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent-light">
+                SaaS
+              </span>
+            )}
+          </div>
+          <h2 className="mt-2 text-xl font-semibold tracking-tight text-white sm:text-2xl">{project.name}</h2>
+          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-zinc-400">{project.summary}</p>
 
-        {project.stack && (
-          <ul className="mt-5 flex flex-wrap gap-1.5" aria-label="Technology">
-            {project.stack.map((item) => (
-              <li key={item} className="rounded-md bg-white/5 px-2 py-1 text-xs text-zinc-300">
-                {item}
-              </li>
-            ))}
-          </ul>
-        )}
+          <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-3">
+            <ul className="flex flex-wrap gap-1.5" aria-label="Platforms">
+              {project.platforms.map((platform) => (
+                <li
+                  key={platform}
+                  className="rounded-full border border-white/15 px-2.5 py-1 text-[10px] font-medium uppercase tracking-wide text-zinc-200"
+                >
+                  {platform}
+                </li>
+              ))}
+            </ul>
+            {project.stack && (
+              <ul className="flex flex-wrap gap-1.5" aria-label="Technology">
+                {project.stack.map((item) => (
+                  <li key={item} className="rounded-md bg-white/5 px-2 py-1 text-xs text-zinc-300">
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
 
-        <div className="mt-auto flex flex-wrap gap-2 pt-6">
+        <div className="flex flex-wrap gap-2 lg:w-40 lg:shrink-0 lg:flex-col lg:items-stretch">
           {links.web && (
             <ProjectLink href={links.web} primary label={`Visit ${project.name} website`}>
               Visit site
@@ -392,7 +399,7 @@ function ProjectLink({
       target="_blank"
       rel="noopener noreferrer"
       aria-label={`${label} (opens in a new tab)`}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-colors ${
+      className={`inline-flex items-center justify-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-medium transition-colors ${
         primary
           ? "bg-accent text-black hover:bg-accent-light"
           : "border border-white/15 text-zinc-200 hover:border-accent/50 hover:text-white"
