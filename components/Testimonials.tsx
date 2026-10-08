@@ -10,6 +10,22 @@ import { StarRating } from "@/components/StarRating";
 // Business Profile reviews link to show a "Reviews on Google" button.
 export const GOOGLE_REVIEWS_URL = process.env.NEXT_PUBLIC_GOOGLE_REVIEWS_URL ?? "";
 
+// How many reviews to show, and how many to draw them from. Each time the
+// page opens, SHOWN are picked at random from a pool of up to POOL_SIZE
+// highlights (the API's maximum), so repeat visitors see different ones.
+const SHOWN = 3;
+const POOL_SIZE = 12;
+
+// Fisher-Yates shuffle, on a copy.
+function shuffled<T>(items: T[]): T[] {
+  const result = [...items];
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [result[i], result[j]] = [result[j], result[i]];
+  }
+  return result;
+}
+
 // The reviews block on the home and portfolio pages: the overall rating, a
 // few highlighted reviews, and the way in to read them all or leave one.
 // It always renders the invitation to leave a review; the rating and cards
@@ -21,10 +37,12 @@ export function Testimonials() {
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([listReviewHighlights(3), getReviewSummary()])
+    Promise.all([listReviewHighlights(POOL_SIZE), getReviewSummary()])
       .then(([highlights, stats]) => {
         if (cancelled) return;
-        setReviews(highlights);
+        // Shuffled here, after the fetch, so it only ever runs in the
+        // browser — nothing random is rendered on the server.
+        setReviews(shuffled(highlights).slice(0, SHOWN));
         setSummary(stats);
       })
       .catch(() => {

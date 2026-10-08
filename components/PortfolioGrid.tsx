@@ -19,6 +19,9 @@ type Project = {
   platforms: Platform[];
   links: { web?: string; appStore?: string; playStore?: string };
   stack?: string[];
+  // Sold as software-as-a-service (subscription, multi-customer) rather
+  // than built as a one-off for a single client.
+  saas?: boolean;
 };
 
 // Real, shipped products — every link below goes to the live site or store
@@ -27,6 +30,7 @@ type Project = {
 const PROJECTS: Project[] = [
   {
     id: "radio-in-one-stop",
+    saas: true,
     name: "Radio In One Stop",
     sector: "Media & Broadcasting",
     summary:
@@ -42,6 +46,7 @@ const PROJECTS: Project[] = [
   },
   {
     id: "rightfitgigs",
+    saas: true,
     name: "RightFitGigs",
     sector: "Jobs Marketplace",
     summary:
@@ -85,6 +90,7 @@ const PROJECTS: Project[] = [
   },
   {
     id: "churchbooks-management",
+    saas: true,
     name: "ChurchBooks Management",
     sector: "Church Accounting",
     summary:
@@ -107,6 +113,7 @@ const PROJECTS: Project[] = [
   },
   {
     id: "hrbooks360",
+    saas: true,
     name: "HRBooks360",
     sector: "HR & Staffing",
     summary: "A financial and staffing management system built for businesses in Jamaica.",
@@ -117,6 +124,7 @@ const PROJECTS: Project[] = [
   },
   {
     id: "sdpmplus",
+    saas: true,
     name: "SDPMPlus",
     sector: "Education",
     summary: "School drop-off and pick-up management, built to make the school run safer and more orderly.",
@@ -127,6 +135,7 @@ const PROJECTS: Project[] = [
   },
   {
     id: "virtual-event-plus",
+    saas: true,
     name: "Virtual Event Plus",
     sector: "Events",
     summary: "A virtual events platform for hosting and joining events online.",
@@ -148,6 +157,7 @@ const PROJECTS: Project[] = [
   },
   {
     id: "islevendor",
+    saas: true,
     name: "IsleVendor",
     sector: "Sales & Logistics",
     summary:
@@ -320,6 +330,12 @@ function ProjectCard({ project }: { project: Project }) {
             </li>
           ))}
         </ul>
+
+        {project.saas && (
+          <span className="absolute right-4 top-4 rounded-full border border-accent/40 bg-accent/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-accent-light backdrop-blur">
+            SaaS
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col p-6">
