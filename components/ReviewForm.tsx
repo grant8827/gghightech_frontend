@@ -17,7 +17,15 @@ const MESSAGE_MAX = 1500;
 const inputClass =
   "mt-2 w-full rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder-zinc-500 outline-none focus:border-accent focus-visible:ring-2 focus-visible:ring-accent/40";
 
-export function ReviewForm({ onSubmitted }: { onSubmitted?: (status: ReviewStatus) => void }) {
+export function ReviewForm({
+  onSubmitted,
+  onDone,
+}: {
+  onSubmitted?: (status: ReviewStatus) => void;
+  // When given, the thank-you message gets a button that calls it — for
+  // hosts (like a dialog) that need to be dismissed afterwards.
+  onDone?: () => void;
+}) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [rating, setRating] = useState(0);
@@ -58,6 +66,16 @@ export function ReviewForm({ onSubmitted }: { onSubmitted?: (status: ReviewStatu
             ? "It's now live on this page."
             : "It will appear on this page once our team has approved it."}
         </p>
+        {onDone && (
+          <button
+            type="button"
+            onClick={onDone}
+            autoFocus
+            className="mt-5 rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-black transition-transform hover:scale-105"
+          >
+            Done
+          </button>
+        )}
       </div>
     );
   }

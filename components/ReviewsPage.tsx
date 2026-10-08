@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ApiError,
   getReviewSummary,
@@ -14,16 +14,34 @@ import { ReviewForm } from "@/components/ReviewForm";
 import { StarRating } from "@/components/StarRating";
 import { GOOGLE_REVIEWS_URL } from "@/components/Testimonials";
 
+// Reviews are fetched a page at a time; "Show more" keeps going until a
+// short page says there are none left, so every published review is reachable.
+const PAGE_SIZE = 30;
+
+// The home and portfolio pages link here with this hash to open the form
+// straight away (see components/Testimonials.tsx).
+const LEAVE_REVIEW_HASH = "#leave-a-review";
+
 export function ReviewsPage() {
   const [reviews, setReviews] = useState<ReviewPublic[]>([]);
   const [summary, setSummary] = useState<ReviewSummary | null>(null);
+  const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // The form lives in a native <dialog>: showModal() gives focus trapping,
+  // Escape-to-close, and an inert page behind it without any extra code.
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  // Bumped each time the dialog opens, so the form starts fresh (blank
+  // fields, no leftover "thank you") instead of showing its last state.
+  const [formKey, setFormKey] = useState(0);
 
   async function refresh() {
     try {
-      const [list, stats] = await Promise.all([listReviews(100), getReviewSummary()]);
+      const [list, stats] = await Promise.all([listReviews(PAGE_SIZE), getReviewSummary()]);
       setReviews(list);
+      setHasMore(list.length === PAGE_SIZE);
       setSummary(stats);
       setError(null);
     } catch (e) {
@@ -33,10 +51,40 @@ export function ReviewsPage() {
     }
   }
 
+  async function loadMore() {
+    setLoadingMore(true);
+    try {
+      const next = await listReviews(PAGE_SIZE, reviews.length);
+      setReviews((current) => {
+        const seen = new Set(current.map((r) => r.id));
+        return [...current, ...next.filter((r) => !seen.has(r.id))];
+      });
+      setHasMore(next.length === PAGE_SIZE);
+    } catch {
+      setError("Could not load more reviews right now.");
+    } finally {
+      setLoadingMore(false);
+    }
+  }
+
+  function openForm() {
+    setFormKey((k) => k + 1);
+    dialogRef.current?.showModal();
+  }
+
+  function closeForm() {
+    dialogRef.current?.close();
+  }
+
   useEffect(() => {
     // Fetch-on-mount: refresh() sets state only after its awaits resolve.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
+    if (window.location.hash === LEAVE_REVIEW_HASH) {
+      openForm();
+      // Drop the hash so a reload doesn't pop the form open again.
+      window.history.replaceState(null, "", window.location.pathname);
+    }
   }, []);
 
   function handleSubmitted(status: ReviewStatus) {
@@ -61,6 +109,12 @@ export function ReviewsPage() {
             Feedback from the people and organizations we&apos;ve built for. Worked with us? We&apos;d love to
             hear from you too.
           </p>
+          <button
+            onClick={openForm}
+            className="mt-8 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-black transition-transform hover:scale-105"
+          >
+            Leave a review
+          </button>
 
           {average !== null && summary && (
             <div className="mt-10 grid max-w-3xl gap-6 rounded-3xl border border-white/10 bg-white/[0.03] p-6 sm:grid-cols-[auto_1fr] sm:items-center sm:gap-10">
@@ -112,7 +166,7 @@ export function ReviewsPage() {
         </div>
       </section>
 
-      <section className="px-6 pb-16" aria-labelledby="all-reviews-heading">
+      <section className="px-6 pb-24" aria-labelledby="all-reviews-heading">
         <div className="mx-auto max-w-6xl">
           <h2 id="all-reviews-heading" className="sr-only">
             All reviews
@@ -126,7 +180,7 @@ export function ReviewsPage() {
           )}
           {!loading && !error && reviews.length === 0 && (
             <p className="rounded-3xl border border-white/10 p-8 text-center text-sm text-zinc-400">
-              No reviews yet. Be the first to leave one below.
+              No reviews yet. Be the first to leave one.
             </p>
           )}
 
@@ -137,21 +191,56 @@ export function ReviewsPage() {
               </li>
             ))}
           </ul>
+
+          {hasMore && (
+            <div className="mt-10 text-center">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="rounded-full border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-white transition-colors hover:border-accent/50 hover:bg-white/10 disabled:opacity-50"
+              >
+                {loadingMore ? "Loading…" : "Show more reviews"}
+              </button>
+            </div>
+          )}
         </div>
       </section>
 
-      <section id="leave-a-review" className="scroll-mt-24 px-6 pb-24" aria-labelledby="leave-a-review-heading">
-        <div className="mx-auto max-w-3xl rounded-3xl border border-accent/20 bg-[radial-gradient(circle_at_top_right,rgba(232,184,75,0.12),transparent_55%),#15120c] p-8 sm:p-12">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Your turn</p>
-          <h2 id="leave-a-review-heading" className="mt-4 text-3xl font-semibold tracking-tight text-white">
-            Leave a review
-          </h2>
+      <dialog
+        ref={dialogRef}
+        aria-labelledby="leave-a-review-heading"
+        // Clicking the dimmed area outside the panel closes it: the panel
+        // fills the dialog's content box, so a click whose target is the
+        // dialog element itself can only have landed on the backdrop.
+        onClick={(e) => {
+          if (e.target === e.currentTarget) closeForm();
+        }}
+        className="m-auto w-[calc(100%-2rem)] max-w-2xl bg-transparent p-0 text-white backdrop:bg-black/75 backdrop:backdrop-blur-sm"
+      >
+        <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl border border-accent/20 bg-[radial-gradient(circle_at_top_right,rgba(232,184,75,0.12),transparent_55%),#15120c] p-6 sm:p-10">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Your turn</p>
+              <h2 id="leave-a-review-heading" className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+                Leave a review
+              </h2>
+            </div>
+            <button
+              onClick={closeForm}
+              aria-label="Close"
+              className="-mr-2 -mt-2 rounded-full p-2 text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+            </button>
+          </div>
           <p className="mb-8 mt-3 text-sm leading-relaxed text-zinc-300">
             Tell us how your project went. It only takes a minute.
           </p>
-          <ReviewForm onSubmitted={handleSubmitted} />
+          <ReviewForm key={formKey} onSubmitted={handleSubmitted} onDone={closeForm} />
         </div>
-      </section>
+      </dialog>
     </main>
   );
 }
