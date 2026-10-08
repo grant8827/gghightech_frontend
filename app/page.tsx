@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PortalDemoSection } from "@/components/PortalDemoSection";
+import { Testimonials } from "@/components/Testimonials";
 import { TrustedBy } from "@/components/TrustedBy";
 
 const benefits = [
@@ -108,6 +109,8 @@ export default function Home() {
       </section>
 
       <PortalDemoSection />
+
+      <Testimonials />
 
       <section className="px-6 py-24">
         <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-8 rounded-3xl border border-accent/20 bg-[radial-gradient(circle_at_top_right,rgba(232,184,75,0.16),transparent_55%),#15120c] p-8 sm:p-12 md:flex-row md:items-end">

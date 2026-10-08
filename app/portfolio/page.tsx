@@ -3,7 +3,8 @@ import { PortfolioGrid } from "@/components/PortfolioGrid";
 
 export const metadata: Metadata = {
   title: "Portfolio — GG HighTech",
-  description: "Internal products and client platforms built by GG HighTech, filterable by category.",
+  description:
+    "Web platforms and mobile apps designed, built, and shipped by GG HighTech — live products you can try today.",
 };
 
 export default function PortfolioPage() {

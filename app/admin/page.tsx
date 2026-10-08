@@ -22,6 +22,7 @@ import { JiraTicketsTab } from "./tabs/JiraTicketsTab";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { PaymentsTab } from "./tabs/PaymentsTab";
 import { ProjectsGitTab } from "./tabs/ProjectsGitTab";
+import { ReviewsTab } from "./tabs/ReviewsTab";
 import { StaffTab } from "./tabs/StaffTab";
 
 const TABS = [
@@ -32,6 +33,7 @@ const TABS = [
   { id: "invoicing", label: "Invoicing" },
   { id: "payments", label: "Payments & Subscriptions" },
   { id: "estimates", label: "Estimates" },
+  { id: "reviews", label: "Reviews" },
 ] as const;
 
 // Kept separate from TABS — rendered below the signed-in user's own badge
@@ -245,6 +247,13 @@ function AdminDashboard({
               token={auth.token}
               orgs={orgs}
               projects={projects}
+              onError={(e) => handleError(e, "Request failed")}
+            />
+          )}
+          {activeTab === "reviews" && (
+            <ReviewsTab
+              token={auth.token}
+              currentUserRole={auth.role}
               onError={(e) => handleError(e, "Request failed")}
             />
           )}

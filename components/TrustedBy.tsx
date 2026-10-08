@@ -14,10 +14,13 @@ const CLIENTS: Client[] = [
   { name: "RentalHist", logo: "/images/rentalhist-logo.png", url: "https://rentalhist.com/" },
   { name: "RightFitGigs", logo: "/images/rightfitgigs_logo.png", url: "https://www.rightfitgigs.com/" },
   { name: "Virtual Event Plus", logo: "/images/virtualeventplus.png", url: "https://www.virtualeventplus.com/" },
+  { name: "GGFM", logo: "/images/GGFM-Logo.png", url: "https://apps.apple.com/us/app/ggfm/id6472855705" },
+  { name: "BDM Radio", logo: "/images/bdm_logo.png", url: "https://apps.apple.com/us/app/bdm-radio/id6473223937" },
+  { name: "SDPMPlus", logo: "/images/SDPMPlus_School_Branding_Logo.png", url: "https://www.sdpmplus.com/" },
   {
-    name: "Safe Haven Restoration Ministry",
+    name: "Safe Haven Restoration Ministries",
     logo: "/images/Safe%20haven%20restoration%20minitry-logo.png",
-    url: "/images/Safe%20haven%20restoration%20minitry-logo.png",
+    url: "https://safehavenrestorationministries.com/",
   },
 ];
 

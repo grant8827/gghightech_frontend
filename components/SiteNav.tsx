@@ -11,6 +11,7 @@ export function SiteNav() {
     { href: "/", label: "Home" },
     { href: "/services", label: "Services" },
     { href: "/portfolio", label: "Portfolio" },
+    { href: "/reviews", label: "Reviews" },
     { href: "/estimate", label: "Get an Estimate" },
   ];
 
@@ -29,7 +30,7 @@ export function SiteNav() {
           GG <span className="text-accent">HighTech</span>
         </Link>
 
-        <div className="hidden items-center gap-8 md:flex">
+        <div className="hidden items-center gap-5 md:flex lg:gap-8">
           {links.map((l) => (
             <Link
               key={l.href}

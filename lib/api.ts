@@ -25,7 +25,13 @@ async function request<T>(path: string, options: RequestInit & { token?: string 
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(res.status, body.detail ?? "Request failed");
+    // FastAPI sends a plain string for errors it raises itself, but a list
+    // of {msg, loc, ...} objects for request-validation failures (422).
+    // Show the first of those as a sentence rather than "[object Object]".
+    const detail = Array.isArray(body.detail)
+      ? String(body.detail[0]?.msg ?? "Please check the form and try again.").replace(/^Value error, /, "")
+      : body.detail;
+    throw new ApiError(res.status, detail ?? "Request failed");
   }
 
   if (res.status === 204) return undefined as T;
@@ -547,3 +553,71 @@ export const generateSubscriptionInvoice = (token: string, planId: string) =>
 
 export const createSubscriptionCheckout = (token: string, planId: string) =>
   request<{ checkout_url: string }>(`/api/v1/subscriptions/${planId}/checkout`, { method: "POST", token });
+
+// ---- Client reviews ----
+// Public side: anyone can submit (no email verification) and read published
+// reviews. The reviewer's email is collected for staff follow-up only and is
+// never returned by the public endpoints — hence two types below.
+
+export type ReviewPublic = {
+  id: string;
+  name: string;
+  rating: number;
+  message: string;
+  is_featured: boolean;
+  created_at: string;
+};
+
+export type ReviewSummary = {
+  average: number | null; // null until there's at least one published review
+  count: number;
+  breakdown: Record<string, number>; // "5".."1" -> how many reviews gave that rating
+};
+
+export type ReviewStatus = "PENDING" | "PUBLISHED" | "HIDDEN";
+
+export type ReviewAdmin = ReviewPublic & {
+  email: string;
+  status: ReviewStatus;
+  moderated_at: string | null;
+  moderated_by: string | null;
+};
+
+export const listReviews = (limit = 50, offset = 0) =>
+  request<ReviewPublic[]>(`/api/v1/reviews?limit=${limit}&offset=${offset}`);
+
+// Staff-featured reviews, or recent 4-5 star ones until something is featured.
+export const listReviewHighlights = (limit = 3) =>
+  request<ReviewPublic[]>(`/api/v1/reviews/highlights?limit=${limit}`);
+
+export const getReviewSummary = () => request<ReviewSummary>("/api/v1/reviews/summary");
+
+// `website` is the form's hidden spam-trap field — always sent, always
+// empty for a real visitor (see components/ReviewForm.tsx).
+export const submitReview = (payload: {
+  name: string;
+  email: string;
+  rating: number;
+  message: string;
+  website: string;
+}) =>
+  request<{ status: ReviewStatus }>("/api/v1/reviews", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const listAllReviews = (token: string) => request<ReviewAdmin[]>("/api/v1/reviews/admin", { token });
+
+export const moderateReview = (
+  token: string,
+  reviewId: string,
+  payload: Partial<{ status: ReviewStatus; is_featured: boolean }>,
+) =>
+  request<ReviewAdmin>(`/api/v1/reviews/${reviewId}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    token,
+  });
+
+export const deleteReview = (token: string, reviewId: string) =>
+  request<void>(`/api/v1/reviews/${reviewId}`, { method: "DELETE", token });
