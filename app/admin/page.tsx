@@ -133,7 +133,7 @@ function AdminDashboard({
     setNotice(null);
     try {
       await inviteUser(auth.token, { org_id: orgId, email, full_name: fullName, role });
-      setNotice(`Invited ${email}. (Email delivery is stubbed — see app/services/email.py.)`);
+      setNotice(`Invited ${email}. They'll get an email with a link to set their password.`);
       return true;
     } catch (e) {
       handleError(e, "Failed to invite user");
@@ -248,7 +248,13 @@ function AdminDashboard({
               onError={(e) => handleError(e, "Request failed")}
             />
           )}
-          {activeTab === "estimates" && <EstimatesTab estimates={estimates} />}
+          {activeTab === "estimates" && (
+            <EstimatesTab
+              token={auth.token}
+              estimates={estimates}
+              onError={(e) => handleError(e, "Request failed")}
+            />
+          )}
         </div>
       </main>
     </div>

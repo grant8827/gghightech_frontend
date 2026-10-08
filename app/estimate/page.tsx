@@ -4,9 +4,9 @@ import { useState } from "react";
 import {
   ApiError,
   createEstimate,
-  estimatePdfUrl,
+  downloadEstimatePdf,
+  type EstimateCreated,
   type EstimatePreview,
-  type EstimateOut,
   type ScopeAnalysis,
 } from "@/lib/api";
 
@@ -48,7 +48,8 @@ export default function EstimatePage() {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [description, setDescription] = useState("");
-  const [savedEstimate, setSavedEstimate] = useState<EstimateOut | null>(null);
+  const [savedEstimate, setSavedEstimate] = useState<EstimateCreated | null>(null);
+  const [downloading, setDownloading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const trimmedDescription = description.trim();
   const descriptionWordCount = trimmedDescription ? trimmedDescription.split(/\s+/).length : 0;
@@ -96,6 +97,19 @@ export default function EstimatePage() {
       setError(e instanceof ApiError ? e.message : "Could not submit the estimate");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleDownloadPdf() {
+    if (!savedEstimate?.pdf_token) return;
+    setDownloading(true);
+    setError(null);
+    try {
+      await downloadEstimatePdf(savedEstimate.id, { pdfToken: savedEstimate.pdf_token });
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Could not download the PDF");
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -263,14 +277,16 @@ export default function EstimatePage() {
           {savedEstimate && (
             <div className="rounded-lg border border-accent/30 bg-accent/10 p-4 text-sm text-accent-light">
               Saved! Reference <span className="font-mono">{savedEstimate.id.slice(0, 8)}</span>.{" "}
-              <a
-                href={estimatePdfUrl(savedEstimate.id)}
-                className="font-medium underline"
-                target="_blank"
-                rel="noreferrer"
-              >
-                Download PDF proposal
-              </a>
+              {savedEstimate.pdf_token && (
+                <button
+                  type="button"
+                  onClick={handleDownloadPdf}
+                  disabled={downloading}
+                  className="font-medium underline disabled:opacity-50"
+                >
+                  {downloading ? "Preparing PDF…" : "Download PDF proposal"}
+                </button>
+              )}
             </div>
           )}
 

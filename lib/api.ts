@@ -63,6 +63,13 @@ export const acceptInvite = (token: string, password: string) =>
     body: JSON.stringify({ token, password }),
   });
 
+// Ends the session on the server (every device, not just this one — the
+// backend has no per-device sessions) so the token can't be reused by
+// anyone who copied it. Callers should clear local state regardless of
+// whether this succeeds.
+export const logout = (token: string) =>
+  request<void>("/api/v1/auth/logout", { method: "POST", token });
+
 export function saveAuth(auth: StoredAuth): void {
   try {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
@@ -164,13 +171,45 @@ export const previewEstimate = (payload: Omit<EstimateCreate, "project_descripti
     body: JSON.stringify(payload),
   });
 
+// What the public POST /estimates returns: the estimate plus a short-lived
+// pdf_token that lets this visitor (and nobody else) download its PDF.
+export type EstimateCreated = EstimateOut & { pdf_token: string | null };
+
 export const createEstimate = (payload: EstimateCreate) =>
-  request<EstimateOut>("/api/v1/estimates", {
+  request<EstimateCreated>("/api/v1/estimates", {
     method: "POST",
     body: JSON.stringify(payload),
   });
 
-export const estimatePdfUrl = (id: string) => `${API_URL}/api/v1/estimates/${id}/pdf`;
+// The estimate PDF contains the lead's contact details, so the API only
+// serves it to signed-in staff (`token`) or to the visitor who just created
+// it (`pdfToken`, from createEstimate above). Credentials go in a header,
+// which a plain <a href> can't send — hence fetch + a blob download rather
+// than a link.
+export async function downloadEstimatePdf(
+  id: string,
+  credentials: { token: string } | { pdfToken: string },
+): Promise<void> {
+  const headers: Record<string, string> =
+    "token" in credentials
+      ? { Authorization: `Bearer ${credentials.token}` }
+      : { "X-Estimate-Token": credentials.pdfToken };
+
+  const res = await fetch(`${API_URL}/api/v1/estimates/${id}/pdf`, { headers });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new ApiError(res.status, body.detail ?? "Could not download the PDF");
+  }
+
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `gghightech-estimate-${id}.pdf`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 // ---- Admin (GGH-401) ----
 // Every call below takes the signed-in admin's bearer token (from

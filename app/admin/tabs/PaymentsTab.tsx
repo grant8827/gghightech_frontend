@@ -71,22 +71,29 @@ export function PaymentsTab({
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!orgId || !name.trim() || !amount || !customerEmail.trim()) return;
+    if (frequency === "ONE_TIME" && !projectId) {
+      onError(new Error("Select a project for a one-time charge"));
+      return;
+    }
     setCreating(true);
     setCreateResult(null);
     try {
+      // Two separate steps on purpose: creating the invoice/plan is the
+      // part that matters for it to show up in the lists below, and must
+      // never be lost just because the follow-up Stripe checkout/email
+      // step (a separate API call) fails — e.g. Stripe not configured yet
+      // in this environment. So the create step's own try/catch always
+      // clears the form and refreshes on success, before the send step
+      // (which can fail independently) even runs.
+      let createdId: string;
       if (frequency === "ONE_TIME") {
-        if (!projectId) {
-          onError(new Error("Select a project for a one-time charge"));
-          return;
-        }
         const invoice = await createInvoice(token, {
           project_id: projectId,
           amount: Number(amount),
           description: name,
           customer_email: customerEmail,
         });
-        const { checkout_url } = await sendInvoicePaymentLink(token, invoice.id);
-        setCreateResult(`Link sent to ${customerEmail}: ${checkout_url}`);
+        createdId = invoice.id;
       } else {
         const isAnnual = frequency === "ANNUAL";
         const isSubscription = isAnnual || subscribe;
@@ -100,17 +107,29 @@ export function PaymentsTab({
           billing_day: isSubscription ? undefined : Number(billingDay),
           customer_email: customerEmail,
         });
-        if (isSubscription) {
-          const { checkout_url } = await createSubscriptionCheckout(token, plan.id);
-          setCreateResult(`Link sent to ${customerEmail}: ${checkout_url}`);
-        } else {
-          setCreateResult(`Plan created — use "Generate this month's invoice" below when it's due.`);
-        }
+        createdId = plan.id;
       }
       setName("");
       setAmount("");
       setCustomerEmail("");
       await refresh();
+
+      const isSubscription = frequency === "ANNUAL" || (frequency === "MONTHLY" && subscribe);
+      try {
+        if (frequency === "ONE_TIME") {
+          const { checkout_url } = await sendInvoicePaymentLink(token, createdId);
+          setCreateResult(`Link sent to ${customerEmail}: ${checkout_url}`);
+        } else if (isSubscription) {
+          const { checkout_url } = await createSubscriptionCheckout(token, createdId);
+          setCreateResult(`Link sent to ${customerEmail}: ${checkout_url}`);
+        } else {
+          setCreateResult(`Plan created — use "Generate this month's invoice" below when it's due.`);
+        }
+      } catch (e) {
+        setCreateResult(
+          `Created, but couldn't send the link: ${e instanceof ApiError ? e.message : "Could not reach the API"}`,
+        );
+      }
     } catch (e) {
       onError(e);
     } finally {
@@ -185,8 +204,7 @@ export function PaymentsTab({
       <h2 className="text-lg font-medium text-white">Payments &amp; Subscriptions</h2>
       <p className="mt-1 text-sm text-zinc-400">
         One-time charges, annual pass-through costs, and monthly retainers — each creates a Stripe
-        Checkout link and emails it to the customer. Email delivery is stubbed (logged only) until a
-        real provider is configured — see app/services/email.py.
+        Checkout link and emails it to the customer.
       </p>
 
       <div className="glass-card mt-6 max-w-md rounded-2xl p-6">

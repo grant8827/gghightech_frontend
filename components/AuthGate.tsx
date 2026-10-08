@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { clearAuth, loadAuth, saveAuth, type StoredAuth } from "@/lib/api";
+import { clearAuth, loadAuth, logout, saveAuth, type StoredAuth } from "@/lib/api";
 import { LoginScreen } from "@/components/LoginScreen";
 
 export type AuthGateRenderProps = {
@@ -38,9 +38,16 @@ export function AuthGate({
     setAuth(next);
   }
 
-  function handleLogout() {
+  // The server already rejected the token — just forget it locally.
+  function handleSessionExpired() {
     clearAuth();
     setAuth(null);
+  }
+
+  function handleLogout() {
+    // Best-effort: sign out locally even if the API can't be reached.
+    if (auth) logout(auth.token).catch(() => {});
+    handleSessionExpired();
   }
 
   if (!checkedStorage) return null; // avoid a login-form flash before localStorage is read
@@ -49,5 +56,5 @@ export function AuthGate({
     return <LoginScreen title={title} subtitle={subtitle} onLoggedIn={handleLoggedIn} />;
   }
 
-  return <>{children({ auth, onSessionExpired: handleLogout, onLogout: handleLogout })}</>;
+  return <>{children({ auth, onSessionExpired: handleSessionExpired, onLogout: handleLogout })}</>;
 }

@@ -16,6 +16,9 @@ export function ClientsTab({
   onInvite: (orgId: string, email: string, fullName: string, role: string) => Promise<boolean>;
 }) {
   const [selectedOrgId, setSelectedOrgId] = useState("");
+  // The internal organization holds staff accounts, which are managed on
+  // the Staff tab — the API refuses client invites into it.
+  const clientOrgs = orgs.filter((o) => o.plan_tier !== "INTERNAL");
   const [orgName, setOrgName] = useState("");
   const [orgDomain, setOrgDomain] = useState("");
   const [inviteEmail, setInviteEmail] = useState("");
@@ -58,7 +61,7 @@ export function ClientsTab({
 
           <h4 className="mt-8 text-sm font-medium text-zinc-300">Existing organizations</h4>
           <ul className="mt-3 space-y-2">
-            {orgs.map((o) => (
+            {clientOrgs.map((o) => (
               <li key={o.id}>
                 <button
                   onClick={() => setSelectedOrgId(o.id)}
@@ -72,14 +75,14 @@ export function ClientsTab({
                 </button>
               </li>
             ))}
-            {orgs.length === 0 && <p className="text-sm text-zinc-500">None yet.</p>}
+            {clientOrgs.length === 0 && <p className="text-sm text-zinc-500">None yet.</p>}
           </ul>
         </div>
 
         <div className="glass-card rounded-2xl p-6">
           <h3 className="text-sm font-medium text-white">Invite client user</h3>
           <p className="mt-1 text-xs text-zinc-500">
-            Selected org: {orgs.find((o) => o.id === selectedOrgId)?.name ?? "none — pick one on the left"}
+            Selected org: {clientOrgs.find((o) => o.id === selectedOrgId)?.name ?? "none — pick one on the left"}
           </p>
           <form onSubmit={handleInvite} className="mt-4 space-y-3">
             <Input label="Email" value={inviteEmail} onChange={setInviteEmail} required type="email" />

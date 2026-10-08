@@ -2,14 +2,34 @@
 
 import { useState } from "react";
 import {
-  estimatePdfUrl,
+  downloadEstimatePdf,
   type EstimateOut,
   type InfrastructureCost,
   type ScopeAnalysis,
 } from "@/lib/api";
 
-export function EstimatesTab({ estimates }: { estimates: EstimateOut[] }) {
+export function EstimatesTab({
+  token,
+  estimates,
+  onError,
+}: {
+  token: string;
+  estimates: EstimateOut[];
+  onError: (e: unknown) => void;
+}) {
   const [expandedEstimateId, setExpandedEstimateId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  async function handleDownloadPdf(id: string) {
+    setDownloadingId(id);
+    try {
+      await downloadEstimatePdf(id, { token });
+    } catch (e) {
+      onError(e);
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   return (
     <div>
@@ -114,14 +134,13 @@ export function EstimatesTab({ estimates }: { estimates: EstimateOut[] }) {
                       </p>
                     </div>
                   )}
-                  <a
-                    href={estimatePdfUrl(est.id)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-3 inline-block text-xs text-accent-light underline"
+                  <button
+                    onClick={() => handleDownloadPdf(est.id)}
+                    disabled={downloadingId === est.id}
+                    className="mt-3 inline-block text-xs text-accent-light underline disabled:opacity-50"
                   >
-                    View PDF proposal
-                  </a>
+                    {downloadingId === est.id ? "Preparing PDF…" : "Download PDF proposal"}
+                  </button>
                 </div>
               )}
             </div>

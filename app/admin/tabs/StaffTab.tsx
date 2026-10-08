@@ -29,6 +29,9 @@ export function StaffTab({
   onError: (e: unknown) => void;
 }) {
   const internalOrg = orgs.find((o) => o.plan_tier === "INTERNAL");
+  // Mirrors the API: only a SUPER_ADMIN may create staff accounts (see
+  // invite_user in backend-fastapi/app/api/routes/users.py).
+  const subTabs = currentUserRole === "SUPER_ADMIN" ? SUB_TABS : SUB_TABS.filter((t) => t.id !== "add");
 
   const [subTab, setSubTab] = useState<(typeof SUB_TABS)[number]["id"]>("staff");
   const [users, setUsers] = useState<UserOut[]>([]);
@@ -65,7 +68,7 @@ export function StaffTab({
       await inviteUser(token, { org_id: internalOrg.id, email, full_name: fullName, role });
       setEmail("");
       setFullName("");
-      setNotice(`Invited ${email}. (Email delivery is stubbed — see app/services/email.py.)`);
+      setNotice(`Invited ${email}. They'll get an email with a link to set their password.`);
       await refresh();
     } catch (e) {
       onError(e);
@@ -94,7 +97,7 @@ export function StaffTab({
       <p className="mt-1 text-sm text-zinc-400">Developers and office staff — everyone who isn&apos;t a client.</p>
 
       <div className="mt-6 flex gap-2 border-b border-white/10">
-        {SUB_TABS.map((t) => (
+        {subTabs.map((t) => (
           <button
             key={t.id}
             onClick={() => setSubTab(t.id)}
@@ -145,7 +148,7 @@ export function StaffTab({
         </div>
       )}
 
-      {subTab === "add" && (
+      {subTab === "add" && currentUserRole === "SUPER_ADMIN" && (
         <div className="mt-6">
           {!internalOrg ? (
             <p className="max-w-md rounded-xl border border-white/10 p-4 text-sm text-zinc-500">
