@@ -416,6 +416,42 @@ export const sendInvoicePaymentLink = (token: string, invoiceId: string) =>
     token,
   });
 
+// ---- Instant payments (staff-only: email + amount → Stripe link) ----
+
+export type InstantPaymentOut = {
+  id: string;
+  customer_email: string;
+  amount: number;
+  description: string | null;
+  status: string;
+  checkout_url: string | null;
+  created_by: string | null;
+  created_at: string;
+  paid_at: string | null;
+};
+
+export type InstantPaymentSent = {
+  payment: InstantPaymentOut;
+  checkout_url: string;
+  email_sent: boolean;
+};
+
+export const listInstantPayments = (token: string) =>
+  request<InstantPaymentOut[]>("/api/v1/instant-payments", { token });
+
+export const createInstantPayment = (
+  token: string,
+  body: { customer_email: string; amount: number; description?: string },
+) =>
+  request<InstantPaymentSent>("/api/v1/instant-payments", {
+    method: "POST",
+    token,
+    body: JSON.stringify(body),
+  });
+
+export const resendInstantPayment = (token: string, paymentId: string) =>
+  request<InstantPaymentSent>(`/api/v1/instant-payments/${paymentId}/resend`, { method: "POST", token });
+
 // ---- Architect status feed ----
 
 export type ProjectUpdateOut = {
