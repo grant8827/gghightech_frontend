@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ApiError, login, type StoredAuth } from "@/lib/api";
 
 // Shared by /admin and /portal — both authenticate the same way against
@@ -73,10 +74,13 @@ export function LoginScreen({
         </button>
       </form>
 
-      <p className="mt-6 text-xs text-zinc-600">
-        Self-issued login (backend-fastapi/app/services/local_auth.py). Invited a new user? They
-        need to follow the link emailed to them (see POST /auth/accept-invite) to set a password
-        before they can sign in here.
+      <p className="mt-6 text-sm text-zinc-400">
+        <Link href="/forgot-password" className="text-accent-light hover:underline">
+          Forgot your password?
+        </Link>
+      </p>
+      <p className="mt-2 text-xs text-zinc-500">
+        Just been invited? Use the link in your invitation email to set your password first.
       </p>
     </div>
   );

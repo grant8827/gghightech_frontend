@@ -69,6 +69,21 @@ export const acceptInvite = (token: string, password: string) =>
     body: JSON.stringify({ token, password }),
   });
 
+// Emails a reset link if the address has an account; the response is the
+// same either way.
+export const forgotPassword = (email: string) =>
+  request<{ detail: string }>("/api/v1/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+
+// Second half of forgotPassword(): signs the user in on success.
+export const resetPassword = (token: string, password: string) =>
+  request<LoginResponse>("/api/v1/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, password }),
+  });
+
 // Ends the session on the server (every device, not just this one — the
 // backend has no per-device sessions) so the token can't be reused by
 // anyone who copied it. Callers should clear local state regardless of

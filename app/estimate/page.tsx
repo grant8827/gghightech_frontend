@@ -236,7 +236,7 @@ export default function EstimatePage() {
 
           <fieldset>
             <legend className="text-sm font-medium text-zinc-300">
-              Email (optional — get a PDF proposal)
+              Email (optional — we&apos;ll email you the PDF proposal)
             </legend>
             <input
               type="email"
@@ -277,6 +277,7 @@ export default function EstimatePage() {
           {savedEstimate && (
             <div className="rounded-lg border border-accent/30 bg-accent/10 p-4 text-sm text-accent-light">
               Saved! Reference <span className="font-mono">{savedEstimate.id.slice(0, 8)}</span>.{" "}
+              {email.trim() && <>A copy is on its way to {email.trim()}. </>}
               {savedEstimate.pdf_token && (
                 <button
                   type="button"
