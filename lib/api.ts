@@ -561,7 +561,12 @@ export type SubscriptionPlanOut = {
   is_subscription: boolean;
   billing_day: number | null;
   customer_email: string | null;
+  // ACTIVE | PAUSED | CANCELED | COMPLETED (all payments of a fixed-length plan made)
   status: string;
+  // Fixed length in billing periods (months/years); null = until canceled.
+  total_cycles: number | null;
+  cycles_billed: number;
+  stripe_subscription_id: string | null;
   created_at: string;
   last_invoiced_at: string | null;
 };
@@ -580,6 +585,7 @@ export const createSubscriptionPlan = (
     is_subscription: boolean;
     billing_day?: number;
     customer_email?: string;
+    total_cycles?: number;
   },
 ) =>
   request<SubscriptionPlanOut>("/api/v1/subscriptions", {

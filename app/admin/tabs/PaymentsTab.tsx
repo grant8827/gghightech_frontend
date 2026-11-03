@@ -54,6 +54,7 @@ export function PaymentsTab({
   const [name, setName] = useState("");
   const [amount, setAmount] = useState("");
   const [billingDay, setBillingDay] = useState("1");
+  const [length, setLength] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [createResult, setCreateResult] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -113,12 +114,14 @@ export function PaymentsTab({
           is_subscription: isSubscription,
           billing_day: isSubscription ? undefined : Number(billingDay),
           customer_email: customerEmail,
+          total_cycles: length ? Number(length) : undefined,
         });
         createdId = plan.id;
       }
       setName("");
       setAmount("");
       setCustomerEmail("");
+      setLength("");
       await refresh();
 
       const isSubscription = frequency === "ANNUAL" || (frequency === "MONTHLY" && subscribe);
@@ -204,6 +207,15 @@ export function PaymentsTab({
     return `${freq} · ${plan.is_subscription ? "recurring" : "manual"}`;
   }
 
+  // "2 of 5 paid" (Stripe counts payments) / "2 of 5 billed" (manual
+  // plans count invoices sent), or "ongoing" with no fixed length.
+  function progressLabel(plan: SubscriptionPlanOut) {
+    const verb = plan.is_subscription ? "paid" : "billed";
+    if (!plan.total_cycles) return plan.cycles_billed ? `ongoing · ${plan.cycles_billed} ${verb}` : "ongoing";
+    const unit = plan.billing_frequency === "ANNUAL" ? "years" : "months";
+    return `${plan.total_cycles} ${unit} · ${plan.cycles_billed} of ${plan.total_cycles} ${verb}`;
+  }
+
   return (
     <div>
       <h2 className="text-lg font-medium text-white">Payments &amp; Subscriptions</h2>
@@ -263,7 +275,7 @@ export function PaymentsTab({
               </label>
             )}
             {frequency === "ANNUAL" && (
-              <p className="mt-3 text-xs text-zinc-500">Annual charges always auto-renew each year.</p>
+              <p className="mt-3 text-xs text-zinc-500">Annual charges auto-renew each year — set a Length to stop after a number of years.</p>
             )}
 
             <form onSubmit={handleCreate} className="mt-4 space-y-3">
@@ -333,6 +345,21 @@ export function PaymentsTab({
                     className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white"
                   />
                 </label>
+                {frequency !== "ONE_TIME" && (
+                  <label className="block w-32 text-sm text-zinc-300">
+                    Length ({frequency === "ANNUAL" ? "years" : "months"})
+                    <input
+                      type="number"
+                      min="1"
+                      max="120"
+                      step="1"
+                      value={length}
+                      onChange={(e) => setLength(e.target.value)}
+                      placeholder="Ongoing"
+                      className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white placeholder-zinc-500"
+                    />
+                  </label>
+                )}
                 {frequency === "MONTHLY" && !subscribe && (
                   <label className="block w-28 text-sm text-zinc-300">
                     Billing day
@@ -375,7 +402,8 @@ export function PaymentsTab({
                       <br />
                       <span className="text-zinc-400">
                         ${plan.amount.toLocaleString()} · {planLabel(plan)}
-                        {plan.billing_day != null && ` on day ${plan.billing_day}`} · {plan.status}
+                        {plan.billing_day != null && ` on day ${plan.billing_day}`} · {progressLabel(plan)} ·{" "}
+                        <span className={plan.status === "COMPLETED" ? "text-emerald-400" : undefined}>{plan.status}</span>
                         {plan.customer_email && ` · ${plan.customer_email}`}
                         {plan.last_invoiced_at && ` · last invoiced ${new Date(plan.last_invoiced_at).toLocaleDateString()}`}
                       </span>
@@ -399,7 +427,7 @@ export function PaymentsTab({
                           {busyId === plan.id ? "…" : "Generate this month's invoice"}
                         </button>
                       )}
-                      {plan.status !== "CANCELED" && (
+                      {plan.status !== "CANCELED" && plan.status !== "COMPLETED" && (
                         <button
                           onClick={() => handleStatusChange(plan.id, plan.status === "ACTIVE" ? "PAUSED" : "ACTIVE")}
                           disabled={busyId === plan.id}
@@ -408,7 +436,7 @@ export function PaymentsTab({
                           {plan.status === "ACTIVE" ? "Pause" : "Resume"}
                         </button>
                       )}
-                      {plan.status !== "CANCELED" && (
+                      {plan.status !== "CANCELED" && plan.status !== "COMPLETED" && (
                         <button
                           onClick={() => handleStatusChange(plan.id, "CANCELED")}
                           disabled={busyId === plan.id}
