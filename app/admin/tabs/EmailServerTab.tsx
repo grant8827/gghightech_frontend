@@ -103,7 +103,72 @@ function errorText(e: unknown) {
   return e instanceof ApiError ? e.message : "Could not reach the API";
 }
 
-export function EmailServerTab({ token, onError }: { token: string; onError: (e: unknown) => void }) {
+export function EmailServerTab({
+  token,
+  enabled,
+  onError,
+}: {
+  token: string;
+  // null while the status check is still running.
+  enabled: boolean | null;
+  onError: (e: unknown) => void;
+}) {
+  if (enabled === null) return <p className="text-sm text-zinc-500">Loading…</p>;
+  if (!enabled) return <NotConnected />;
+  return <EmailServerConsole token={token} onError={onError} />;
+}
+
+function NotConnected() {
+  const steps = [
+    {
+      title: "Mail server",
+      body: "Apache James on a VPS with port 25 open and reverse DNS (PTR) set to the sending hostname, e.g. mail.gghightech.org.",
+    },
+    {
+      title: "Management service",
+      body: "The gghightech-backend-java service on Railway, connected to the database and to the mail server (private network only).",
+    },
+    {
+      title: "Connect this dashboard",
+      body: "Set EMAIL_SERVICE_URL and EMAIL_SERVICE_TOKEN on the gghightech-backend service. This tab then switches on by itself.",
+    },
+  ];
+  return (
+    <div>
+      <h2 className="text-lg font-medium text-white">Email Server</h2>
+      <p className="mt-1 text-sm text-zinc-400">
+        Send email from any of your domains through GG HighTech&apos;s own mail server.
+      </p>
+      <div className="glass-card mt-6 max-w-2xl rounded-2xl p-6">
+        <div className="flex items-center gap-2">
+          <span className="rounded-full border border-amber-300/30 bg-amber-300/10 px-2 py-0.5 text-xs text-amber-200">
+            Not connected
+          </span>
+          <span className="text-sm text-zinc-300">The Email Server isn&apos;t set up on this environment yet.</span>
+        </div>
+        <p className="mt-4 text-sm text-zinc-400">
+          Once it&apos;s connected, this tab is where you add sending domains, publish and verify their DNS
+          records, create SMTP credentials for your apps, and follow every message sent.
+        </p>
+        <ol className="mt-5 space-y-3">
+          {steps.map((step, i) => (
+            <li key={step.title} className="flex gap-3 text-sm">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/15 text-xs text-zinc-300">
+                {i + 1}
+              </span>
+              <span>
+                <span className="text-white">{step.title}</span>
+                <span className="block text-zinc-400">{step.body}</span>
+              </span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+function EmailServerConsole({ token, onError }: { token: string; onError: (e: unknown) => void }) {
   const [view, setView] = useState<View>("overview");
   const [domains, setDomains] = useState<EmailDomain[]>([]);
   const [loading, setLoading] = useState(true);

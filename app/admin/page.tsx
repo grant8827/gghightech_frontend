@@ -43,8 +43,8 @@ const TABS = [
 // is an account/access-control concern, not a delivery/billing one.
 const STAFF_TAB = { id: "staff", label: "Staff" } as const;
 
-// SUPER_ADMIN only, and only once the backend has an Email Server
-// configured (EMAIL_SERVICE_URL); otherwise the entry doesn't appear.
+// SUPER_ADMIN only. Until the backend has an Email Server connected
+// (EMAIL_SERVICE_URL), the tab shows the setup status instead.
 const EMAIL_TAB = { id: "email", label: "Email Server" } as const;
 
 type TabId = (typeof TABS)[number]["id"] | typeof STAFF_TAB.id | typeof EMAIL_TAB.id;
@@ -74,7 +74,9 @@ function AdminDashboard({
   const [estimates, setEstimates] = useState<EstimateOut[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [emailEnabled, setEmailEnabled] = useState(false);
+  // null = not checked yet.
+  const [emailEnabled, setEmailEnabled] = useState<boolean | null>(null);
+  const isSuperAdmin = auth.role === "SUPER_ADMIN";
 
   function handleError(e: unknown, fallback: string) {
     if (e instanceof ApiError) {
@@ -110,7 +112,7 @@ function AdminDashboard({
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     if (auth.role === "SUPER_ADMIN") {
-      // Best-effort: if this fails the tab simply stays hidden.
+      // Best-effort: if this fails the tab shows the "not connected" state.
       emailServerStatus(auth.token)
         .then((s) => setEmailEnabled(s.enabled))
         .catch(() => setEmailEnabled(false));
@@ -176,7 +178,7 @@ function AdminDashboard({
               {tab.label}
             </button>
           ))}
-          {emailEnabled && (
+          {isSuperAdmin && (
             <button
               onClick={() => setActiveTab(EMAIL_TAB.id)}
               className={`rounded-lg px-3 py-2 text-left text-sm transition-colors ${
@@ -282,8 +284,12 @@ function AdminDashboard({
               onError={(e) => handleError(e, "Request failed")}
             />
           )}
-          {activeTab === "email" && emailEnabled && (
-            <EmailServerTab token={auth.token} onError={(e) => handleError(e, "Request failed")} />
+          {activeTab === "email" && isSuperAdmin && (
+            <EmailServerTab
+              token={auth.token}
+              enabled={emailEnabled}
+              onError={(e) => handleError(e, "Request failed")}
+            />
           )}
           {activeTab === "estimates" && (
             <EstimatesTab
