@@ -5,6 +5,7 @@ import {
   ApiError,
   createOrganization,
   createProject,
+  emailServerStatus,
   inviteUser,
   listEstimates,
   listOrganizations,
@@ -24,6 +25,7 @@ import { PaymentsTab } from "./tabs/PaymentsTab";
 import { ProjectsGitTab } from "./tabs/ProjectsGitTab";
 import { ReviewsTab } from "./tabs/ReviewsTab";
 import { StaffTab } from "./tabs/StaffTab";
+import { EmailServerTab } from "./tabs/EmailServerTab";
 
 const TABS = [
   { id: "overview", label: "Overview" },
@@ -41,7 +43,11 @@ const TABS = [
 // is an account/access-control concern, not a delivery/billing one.
 const STAFF_TAB = { id: "staff", label: "Staff" } as const;
 
-type TabId = (typeof TABS)[number]["id"] | typeof STAFF_TAB.id;
+// SUPER_ADMIN only, and only once the backend has an Email Server
+// configured (EMAIL_SERVICE_URL); otherwise the entry doesn't appear.
+const EMAIL_TAB = { id: "email", label: "Email Server" } as const;
+
+type TabId = (typeof TABS)[number]["id"] | typeof STAFF_TAB.id | typeof EMAIL_TAB.id;
 
 export default function AdminPage() {
   return (
@@ -68,6 +74,7 @@ function AdminDashboard({
   const [estimates, setEstimates] = useState<EstimateOut[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [emailEnabled, setEmailEnabled] = useState(false);
 
   function handleError(e: unknown, fallback: string) {
     if (e instanceof ApiError) {
@@ -102,6 +109,12 @@ function AdminDashboard({
     // not synchronously within this effect body.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
+    if (auth.role === "SUPER_ADMIN") {
+      // Best-effort: if this fails the tab simply stays hidden.
+      emailServerStatus(auth.token)
+        .then((s) => setEmailEnabled(s.enabled))
+        .catch(() => setEmailEnabled(false));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -163,6 +176,18 @@ function AdminDashboard({
               {tab.label}
             </button>
           ))}
+          {emailEnabled && (
+            <button
+              onClick={() => setActiveTab(EMAIL_TAB.id)}
+              className={`rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+                activeTab === EMAIL_TAB.id
+                  ? "bg-accent/15 text-accent-light"
+                  : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
+              }`}
+            >
+              {EMAIL_TAB.label}
+            </button>
+          )}
         </nav>
 
         <div className="mt-8 space-y-2 border-t border-white/10 pt-4">
@@ -256,6 +281,9 @@ function AdminDashboard({
               currentUserRole={auth.role}
               onError={(e) => handleError(e, "Request failed")}
             />
+          )}
+          {activeTab === "email" && emailEnabled && (
+            <EmailServerTab token={auth.token} onError={(e) => handleError(e, "Request failed")} />
           )}
           {activeTab === "estimates" && (
             <EstimatesTab

@@ -431,6 +431,101 @@ export const sendInvoicePaymentLink = (token: string, invoiceId: string) =>
     token,
   });
 
+// ---- Email Server (SUPER_ADMIN; proxied to the Java service) ----
+
+export type DnsRecord = { purpose: string; type: string; name: string; value: string; hint: string };
+export type RecordCheck = { purpose: string; name: string; ok: boolean; found: string[]; problem: string | null };
+
+export type EmailDomain = {
+  id: string;
+  name: string;
+  status: "PENDING_DNS" | "VERIFIED";
+  createdAt: string;
+  createdBy: string | null;
+  verifiedAt: string | null;
+  lastCheckedAt: string | null;
+  dnsRecords: DnsRecord[];
+  lastCheck: RecordCheck[];
+  activeAccounts: number;
+};
+
+export type SmtpAccount = {
+  id: string;
+  domainId: string;
+  address: string;
+  description: string | null;
+  status: "ACTIVE" | "REVOKED";
+  createdAt: string;
+  createdBy: string | null;
+  revokedAt: string | null;
+  revokedBy: string | null;
+};
+
+// Returned once, at creation: the password can't be retrieved again.
+export type NewSmtpCredential = {
+  account: SmtpAccount;
+  smtpHost: string;
+  smtpPort: number;
+  security: string;
+  username: string;
+  password: string;
+};
+
+export type EmailMessage = {
+  mailId: string;
+  messageId: string | null;
+  account: string | null;
+  domain: string | null;
+  sender: string | null;
+  recipients: string[];
+  status: string;
+  firstSeen: string;
+  lastUpdate: string;
+  history: { event: string; at: string; error: string | null }[];
+};
+
+export type EmailOverview = {
+  domains: number;
+  verifiedDomains: number;
+  activeAccounts: number;
+  last24h: Record<string, number>;
+  smtpHost: string | null;
+  smtpPort: number;
+};
+
+const EMAIL = "/api/v1/email-server";
+
+export const emailServerStatus = (token: string) => request<{ enabled: boolean }>(`${EMAIL}/status`, { token });
+
+export const emailOverview = (token: string) => request<EmailOverview>(`${EMAIL}/overview`, { token });
+
+export const listEmailDomains = (token: string) => request<EmailDomain[]>(`${EMAIL}/domains`, { token });
+
+export const addEmailDomain = (token: string, name: string) =>
+  request<EmailDomain>(`${EMAIL}/domains`, { method: "POST", token, body: JSON.stringify({ name }) });
+
+export const verifyEmailDomain = (token: string, domainId: string) =>
+  request<EmailDomain>(`${EMAIL}/domains/${domainId}/verify`, { method: "POST", token });
+
+export const deleteEmailDomain = (token: string, domainId: string) =>
+  request<void>(`${EMAIL}/domains/${domainId}`, { method: "DELETE", token });
+
+export const listSmtpAccounts = (token: string, domainId: string) =>
+  request<SmtpAccount[]>(`${EMAIL}/domains/${domainId}/accounts`, { token });
+
+export const createSmtpAccount = (token: string, domainId: string, localPart: string, description?: string) =>
+  request<NewSmtpCredential>(`${EMAIL}/domains/${domainId}/accounts`, {
+    method: "POST",
+    token,
+    body: JSON.stringify({ local_part: localPart, description: description || undefined }),
+  });
+
+export const revokeSmtpAccount = (token: string, accountId: string) =>
+  request<SmtpAccount>(`${EMAIL}/accounts/${accountId}/revoke`, { method: "POST", token });
+
+export const listEmailMessages = (token: string, domain?: string) =>
+  request<EmailMessage[]>(`${EMAIL}/messages${domain ? `?domain=${encodeURIComponent(domain)}` : ""}`, { token });
+
 // ---- Instant payments (staff-only: email + amount → Stripe link) ----
 
 export type InstantPaymentOut = {
