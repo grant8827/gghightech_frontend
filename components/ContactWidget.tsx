@@ -31,7 +31,7 @@ export function ContactWidget() {
     <>
       <button
         onClick={open}
-        aria-label="Send us a message"
+        aria-label="Contact us"
         className="fixed bottom-5 right-5 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-accent text-black shadow-[0_10px_40px_rgba(232,184,75,0.35)] transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/40 sm:bottom-8 sm:right-8"
       >
         <MessageIcon />
@@ -49,7 +49,7 @@ export function ContactWidget() {
         <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-3xl border border-accent/20 bg-[radial-gradient(circle_at_top_right,rgba(232,184,75,0.12),transparent_55%),#15120c] p-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Message us</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Contact us</p>
               <h2 id="contact-widget-heading" className="mt-2 text-xl font-semibold tracking-tight text-white">
                 How can we help?
               </h2>
