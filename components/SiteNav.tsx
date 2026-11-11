@@ -12,6 +12,7 @@ export function SiteNav() {
     { href: "/services", label: "Services" },
     { href: "/portfolio", label: "Portfolio" },
     { href: "/reviews", label: "Reviews" },
+    { href: "/contact", label: "Message" },
     { href: "/estimate", label: "Get an Estimate" },
   ];
 

@@ -51,6 +51,10 @@ export default function Home() {
               <Link href="/portfolio" className="rounded-full border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-white transition-colors hover:border-accent/50 hover:bg-white/10">
                 Explore our work
               </Link>
+              <Link href="/contact" className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/5 px-6 py-3 text-sm font-medium text-white transition-colors hover:border-accent/50 hover:bg-white/10">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20.5l1.4-4.9A8 8 0 1 1 21 12z" /></svg>
+                Message us
+              </Link>
             </div>
             <p className="mt-8 text-sm text-zinc-500">From first concept to launch and beyond.</p>
           </div>

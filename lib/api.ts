@@ -773,3 +773,55 @@ export const moderateReview = (
 
 export const deleteReview = (token: string, reviewId: string) =>
   request<void>(`/api/v1/reviews/${reviewId}`, { method: "DELETE", token });
+
+// ---- Contact messages ----
+// Sent from the Contact page and the floating message button; read by staff
+// in the admin Messages tab. Never shown publicly.
+
+export type MessageStatus = "NEW" | "READ" | "ARCHIVED";
+export type MessageSource = "CONTACT_PAGE" | "WIDGET";
+
+export type ContactMessageAdmin = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  subject: string | null;
+  message: string;
+  source: MessageSource;
+  status: MessageStatus;
+  created_at: string;
+  handled_at: string | null;
+  handled_by: string | null;
+};
+
+// `website` is the form's hidden spam-trap field — always sent, always
+// empty for a real visitor (see components/ContactForm.tsx).
+export const sendContactMessage = (payload: {
+  name: string;
+  email: string;
+  phone: string;
+  subject: string;
+  message: string;
+  source: MessageSource;
+  website: string;
+}) =>
+  request<{ ok: boolean }>("/api/v1/messages", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+export const listMessages = (token: string) => request<ContactMessageAdmin[]>("/api/v1/messages/admin", { token });
+
+export const getUnreadMessageCount = (token: string) =>
+  request<{ unread: number }>("/api/v1/messages/admin/unread-count", { token });
+
+export const updateMessageStatus = (token: string, messageId: string, status: MessageStatus) =>
+  request<ContactMessageAdmin>(`/api/v1/messages/${messageId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+    token,
+  });
+
+export const deleteMessage = (token: string, messageId: string) =>
+  request<void>(`/api/v1/messages/${messageId}`, { method: "DELETE", token });

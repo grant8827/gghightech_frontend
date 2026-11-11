@@ -6,6 +6,7 @@ import {
   createOrganization,
   createProject,
   emailServerStatus,
+  getUnreadMessageCount,
   inviteUser,
   listEstimates,
   listOrganizations,
@@ -20,6 +21,7 @@ import { ClientsTab } from "./tabs/ClientsTab";
 import { EstimatesTab } from "./tabs/EstimatesTab";
 import { InvoicingTab } from "./tabs/InvoicingTab";
 import { JiraTicketsTab } from "./tabs/JiraTicketsTab";
+import { MessagesTab } from "./tabs/MessagesTab";
 import { OverviewTab } from "./tabs/OverviewTab";
 import { PaymentsTab } from "./tabs/PaymentsTab";
 import { ProjectsGitTab } from "./tabs/ProjectsGitTab";
@@ -29,6 +31,7 @@ import { EmailServerTab } from "./tabs/EmailServerTab";
 
 const TABS = [
   { id: "overview", label: "Overview" },
+  { id: "messages", label: "Messages" },
   { id: "clients", label: "Clients" },
   { id: "projects", label: "Projects & Git" },
   { id: "jira", label: "Jira Tickets" },
@@ -77,6 +80,10 @@ function AdminDashboard({
   // null = not checked yet.
   const [emailEnabled, setEmailEnabled] = useState<boolean | null>(null);
   const isSuperAdmin = auth.role === "SUPER_ADMIN";
+  // Shown as a badge on the Messages tab. Only SUPER_ADMIN and
+  // PROJECT_MANAGER can read messages; for other roles it stays 0.
+  const [unreadMessages, setUnreadMessages] = useState(0);
+  const canReadMessages = auth.role === "SUPER_ADMIN" || auth.role === "PROJECT_MANAGER";
 
   function handleError(e: unknown, fallback: string) {
     if (e instanceof ApiError) {
@@ -117,6 +124,15 @@ function AdminDashboard({
         .then((s) => setEmailEnabled(s.enabled))
         .catch(() => setEmailEnabled(false));
     }
+    if (!canReadMessages) return;
+    const loadUnread = () =>
+      getUnreadMessageCount(auth.token)
+        .then((r) => setUnreadMessages(r.unread))
+        .catch(() => {}); // best-effort badge; the tab itself reports errors
+    loadUnread();
+    // Pick up new messages while the dashboard stays open.
+    const timer = window.setInterval(loadUnread, 60_000);
+    return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -165,17 +181,23 @@ function AdminDashboard({
         <p className="mt-1 text-xs text-zinc-500">Complete control over clients, delivery, and billing.</p>
 
         <nav className="mt-6 flex flex-col gap-1">
-          {TABS.map((tab) => (
+          {TABS.filter((tab) => tab.id !== "messages" || canReadMessages).map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+              className={`flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                 activeTab === tab.id
                   ? "bg-accent/15 text-accent-light"
                   : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200"
               }`}
             >
               {tab.label}
+              {tab.id === "messages" && unreadMessages > 0 && (
+                <span className="ml-2 rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold leading-none text-black">
+                  {unreadMessages}
+                  <span className="sr-only"> unread</span>
+                </span>
+              )}
             </button>
           ))}
           {isSuperAdmin && (
@@ -234,6 +256,14 @@ function AdminDashboard({
               orgs={orgs}
               projects={projects}
               estimates={estimates}
+              onError={(e) => handleError(e, "Request failed")}
+            />
+          )}
+          {activeTab === "messages" && canReadMessages && (
+            <MessagesTab
+              token={auth.token}
+              currentUserRole={auth.role}
+              onUnreadChange={setUnreadMessages}
               onError={(e) => handleError(e, "Request failed")}
             />
           )}

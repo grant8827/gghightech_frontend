@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { SiteNav } from "@/components/SiteNav";
 import { SiteFooter } from "@/components/SiteFooter";
+import { ContactWidget } from "@/components/ContactWidget";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -30,6 +31,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <SiteNav />
         <div className="flex flex-1 flex-col">{children}</div>
         <SiteFooter />
+        <ContactWidget />
       </body>
     </html>
   );
