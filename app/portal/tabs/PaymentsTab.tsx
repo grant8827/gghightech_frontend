@@ -15,7 +15,11 @@ import {
 export type PaymentsView = "pay" | "receipts";
 
 const money = (n: number) => n.toLocaleString(undefined, { style: "currency", currency: "USD" });
-const date = (iso: string) => new Date(iso).toLocaleDateString(undefined, { dateStyle: "medium" });
+// Date-only values ("2026-11-13") are read as local dates; parsing them
+// with new Date() alone would treat them as UTC and show the day before in
+// time zones west of UTC.
+const date = (iso: string) =>
+  new Date(iso.length === 10 ? `${iso}T00:00:00` : iso).toLocaleDateString(undefined, { dateStyle: "medium" });
 
 const primaryButton =
   "rounded-full bg-accent px-4 py-2 text-xs font-semibold text-black transition-transform hover:scale-105 disabled:opacity-50 disabled:hover:scale-100";
@@ -54,6 +58,8 @@ export function PaymentsTab({
   const paidTotal = paid.reduce((sum, i) => sum + i.amount, 0);
 
   const projectTitle = (id: string) => projects.find((p) => p.id === id)?.title ?? "Project";
+  const now = new Date();
+  const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
   function invoiceTitle(inv: InvoiceOut) {
     const milestone = inv.milestone_id ? milestones[inv.project_id]?.find((m) => m.id === inv.milestone_id) : null;
     return milestone ? `Milestone: ${milestone.title}` : inv.description || "Invoice";
@@ -131,15 +137,24 @@ export function PaymentsTab({
                 className="glass-card flex flex-col gap-4 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between"
               >
                 <div className="min-w-0">
-                  <p className="truncate font-medium text-white">{invoiceTitle(inv)}</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {inv.invoice_number && <span className="font-mono text-xs text-zinc-400">{inv.invoice_number}</span>}
+                    {inv.due_date && inv.due_date < today && (
+                      <span className="rounded-full border border-red-400/30 bg-red-400/10 px-2 py-0.5 text-[10px] font-semibold text-red-300">
+                        ! Overdue
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 truncate font-medium text-white">{invoiceTitle(inv)}</p>
                   <p className="mt-1 text-xs text-zinc-500">
-                    {projectTitle(inv.project_id)} · Issued {date(inv.created_at)}
+                    {projectTitle(inv.project_id)} · Issued {date(inv.issue_date ?? inv.created_at)}
+                    {inv.due_date && ` · Due ${date(inv.due_date)}`}
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="text-lg font-semibold tabular-nums text-white">{money(inv.amount)}</span>
                   <button
-                    onClick={() => run(`pdf-${inv.id}`, () => downloadInvoicePdf(token, inv.id))}
+                    onClick={() => run(`pdf-${inv.id}`, () => downloadInvoicePdf(token, inv.id, inv.invoice_number))}
                     disabled={busy === `pdf-${inv.id}`}
                     className={secondaryButton}
                   >

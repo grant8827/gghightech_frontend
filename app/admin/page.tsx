@@ -36,7 +36,7 @@ const TABS = [
   { id: "clients", label: "Clients" },
   { id: "projects", label: "Projects & Git" },
   { id: "jira", label: "Jira Tickets" },
-  { id: "invoicing", label: "Invoicing" },
+  { id: "invoicing", label: "Invoicing / Contracts" },
   { id: "payments", label: "Payments & Subscriptions" },
   { id: "estimates", label: "Estimates" },
   { id: "reviews", label: "Reviews" },
@@ -307,7 +307,12 @@ function AdminDashboard({
             />
           )}
           {activeTab === "invoicing" && (
-            <InvoicingTab token={auth.token} projects={projects} onError={(e) => handleError(e, "Request failed")} />
+            <InvoicingTab
+              token={auth.token}
+              projects={projects}
+              orgs={orgs}
+              onError={(e) => handleError(e, "Request failed")}
+            />
           )}
           {activeTab === "payments" && (
             <PaymentsTab

@@ -4,21 +4,25 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
   ApiError,
+  listContracts,
   listInvoices,
   listMilestones,
   listProjects,
+  type ContractOut,
   type InvoiceOut,
   type MilestoneOut,
   type ProjectOut,
   type StoredAuth,
 } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
+import { ContractsTab } from "./tabs/ContractsTab";
 import { PaymentsTab, type PaymentsView } from "./tabs/PaymentsTab";
 import { ProjectsTab } from "./tabs/ProjectsTab";
 
 const TABS = [
   { id: "projects", label: "View projects" },
   { id: "payments", label: "Payments" },
+  { id: "contracts", label: "Contracts" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
@@ -53,8 +57,9 @@ function ClientDashboard({
   // (STRIPE_SUCCESS_URL / STRIPE_CANCEL_URL on the backend).
   const paymentResult = searchParams.get("payment");
 
+  const requestedTab = searchParams.get("tab");
   const [activeTab, setActiveTab] = useState<TabId>(
-    paymentResult || searchParams.get("tab") === "payments" ? "payments" : "projects",
+    paymentResult || requestedTab === "payments" ? "payments" : requestedTab === "contracts" ? "contracts" : "projects",
   );
   const [paymentsView, setPaymentsView] = useState<PaymentsView>(paymentResult === "success" ? "receipts" : "pay");
   const [banner, setBanner] = useState<{ tone: "ok" | "info"; text: string } | null>(
@@ -68,6 +73,7 @@ function ClientDashboard({
   const [projects, setProjects] = useState<ProjectOut[]>([]);
   const [milestones, setMilestones] = useState<Record<string, MilestoneOut[]>>({});
   const [invoices, setInvoices] = useState<InvoiceOut[]>([]);
+  const [contracts, setContracts] = useState<ContractOut[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -81,10 +87,15 @@ function ClientDashboard({
 
   async function refresh() {
     try {
-      const [projectsRes, invoicesRes] = await Promise.all([listProjects(auth.token), listInvoices(auth.token)]);
+      const [projectsRes, invoicesRes, contractsRes] = await Promise.all([
+        listProjects(auth.token),
+        listInvoices(auth.token),
+        listContracts(auth.token),
+      ]);
       const milestoneLists = await Promise.all(projectsRes.map((p) => listMilestones(auth.token, p.id)));
       setProjects(projectsRes);
       setInvoices(invoicesRes);
+      setContracts(contractsRes);
       setMilestones(Object.fromEntries(projectsRes.map((p, i) => [p.id, milestoneLists[i]])));
       setError(null);
     } catch (e) {
@@ -110,13 +121,14 @@ function ClientDashboard({
   }, []);
 
   const pendingCount = invoices.filter((i) => i.status === "PENDING").length;
+  const toSignCount = contracts.filter((c) => c.status === "SENT").length;
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-white">Client dashboard</h1>
-          <p className="mt-1 text-sm text-zinc-400">Track your projects, pay invoices and download receipts.</p>
+          <p className="mt-1 text-sm text-zinc-400">Track your projects, pay invoices, download receipts and sign contracts.</p>
         </div>
         <div className="flex items-center gap-3">
           <span className="rounded-full border border-accent/30 bg-accent/10 px-3 py-1 text-xs text-accent-light">
@@ -153,6 +165,12 @@ function ClientDashboard({
                   <span className="sr-only"> unpaid</span>
                 </span>
               )}
+              {tab.id === "contracts" && toSignCount > 0 && (
+                <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold leading-none text-black">
+                  {toSignCount}
+                  <span className="sr-only"> to sign</span>
+                </span>
+              )}
             </button>
           );
         })}
@@ -184,6 +202,16 @@ function ClientDashboard({
           <p className="text-sm text-zinc-500">Loading…</p>
         ) : activeTab === "projects" ? (
           <ProjectsTab projects={projects} milestones={milestones} />
+        ) : activeTab === "contracts" ? (
+          <ContractsTab
+            token={auth.token}
+            canSign={auth.role === "CLIENT_ADMIN"}
+            signerDefault={auth.full_name}
+            contracts={contracts}
+            projects={projects}
+            onSigned={refresh}
+            onError={handleError}
+          />
         ) : (
           <PaymentsTab
             token={auth.token}

@@ -426,6 +426,33 @@ export type InvoiceOut = {
   // otherwise how staff recorded it (see markInvoicePaid).
   payment_method: PaymentMethod | null;
   payment_reference: string | null;
+  // INV-YYYY-NNNN. Older milestone/subscription invoices have no line items.
+  invoice_number: string | null;
+  line_items: LineItem[] | null;
+  subtotal: number | null;
+  tax_rate: number | null;
+  tax_amount: number | null;
+  issue_date: string | null;
+  due_date: string | null;
+  notes: string | null;
+  bill_to_name: string | null;
+  sent_at: string | null;
+};
+
+export type LineItem = { description: string; quantity: number; unit_price: number };
+
+export type InvoiceCreate = {
+  project_id: string;
+  // Itemized, or a single amount with a description (older callers).
+  line_items?: LineItem[];
+  amount?: number;
+  tax_rate?: number;
+  description?: string;
+  customer_email?: string;
+  bill_to_name?: string;
+  issue_date?: string;
+  due_date?: string;
+  notes?: string;
 };
 
 export type PaymentMethod = "CARD" | "CHECK" | "WIRE" | "CASH" | "OTHER";
@@ -447,11 +474,9 @@ export const approveMilestone = (token: string, milestoneId: string) =>
 export const listInvoices = (token: string, projectId?: string) =>
   request<InvoiceOut[]>(`/api/v1/invoices${projectId ? `?project_id=${projectId}` : ""}`, { token });
 
-// Staff-only, ad-hoc — not tied to a milestone (retainers, one-off charges).
-export const createInvoice = (
-  token: string,
-  payload: { project_id: string; amount: number; description: string; customer_email?: string },
-) =>
+// Staff-only, ad-hoc — not tied to a milestone. The server computes the
+// totals from the line items and tax rate.
+export const createInvoice = (token: string, payload: InvoiceCreate) =>
   request<InvoiceOut>("/api/v1/invoices", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -476,8 +501,89 @@ async function downloadAuthedPdf(token: string, path: string, filename: string):
   URL.revokeObjectURL(url);
 }
 
-export const downloadInvoicePdf = (token: string, invoiceId: string) =>
-  downloadAuthedPdf(token, `/api/v1/invoices/${invoiceId}/pdf`, `gghightech-invoice-${invoiceId}.pdf`);
+export const downloadInvoicePdf = (token: string, invoiceId: string, number?: string | null) =>
+  downloadAuthedPdf(token, `/api/v1/invoices/${invoiceId}/pdf`, `gghightech-invoice-${number ?? invoiceId}.pdf`);
+
+// Staff-only: emails the invoice PDF with a pay-online link; also resends.
+export const sendInvoice = (token: string, invoiceId: string) =>
+  request<{ invoice: InvoiceOut; email_sent: boolean; checkout_url: string | null }>(
+    `/api/v1/invoices/${invoiceId}/send`,
+    { method: "POST", token },
+  );
+
+// ---- Contracts ----
+
+export type ContractStatus = "DRAFT" | "SENT" | "SIGNED" | "VOID";
+export type PaymentStep = { label: string; amount: number; due: string };
+
+export type ContractFields = {
+  title: string;
+  client_name: string;
+  client_email: string | null;
+  effective_date: string | null;
+  scope: string;
+  deliverables: string[];
+  timeline: string | null;
+  payment_schedule: PaymentStep[];
+  total_value: number;
+  payment_terms: string | null;
+  terms: string;
+};
+
+export type ContractOut = ContractFields & {
+  id: string;
+  org_id: string;
+  project_id: string;
+  contract_number: string | null;
+  status: ContractStatus;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string | null;
+  sent_at: string | null;
+  provider_signer_name: string | null;
+  signed_at: string | null;
+  signer_name: string | null;
+  signer_email: string | null;
+  signed_content_hash: string | null;
+  voided_at: string | null;
+};
+
+export const listContracts = (token: string, projectId?: string) =>
+  request<ContractOut[]>(`/api/v1/contracts${projectId ? `?project_id=${projectId}` : ""}`, { token });
+
+export const getContractDefaults = (token: string) =>
+  request<{ terms: string; payment_terms: string }>("/api/v1/contracts/defaults", { token });
+
+export const createContract = (token: string, payload: ContractFields & { project_id: string }) =>
+  request<ContractOut>("/api/v1/contracts", { method: "POST", body: JSON.stringify(payload), token });
+
+// Editing a SENT contract returns it to DRAFT (it must be sent again).
+export const updateContract = (token: string, id: string, payload: Partial<ContractFields>) =>
+  request<ContractOut>(`/api/v1/contracts/${id}`, { method: "PATCH", body: JSON.stringify(payload), token });
+
+export const sendContract = (token: string, id: string) =>
+  request<{ contract: ContractOut; email_sent: boolean }>(`/api/v1/contracts/${id}/send`, { method: "POST", token });
+
+// CLIENT_ADMIN only.
+export const signContract = (token: string, id: string, signerName: string) =>
+  request<ContractOut>(`/api/v1/contracts/${id}/sign`, {
+    method: "POST",
+    body: JSON.stringify({ signer_name: signerName, agree: true }),
+    token,
+  });
+
+export const voidContract = (token: string, id: string) =>
+  request<ContractOut>(`/api/v1/contracts/${id}/void`, { method: "POST", token });
+
+export const deleteContract = (token: string, id: string) =>
+  request<void>(`/api/v1/contracts/${id}`, { method: "DELETE", token });
+
+export const downloadContractPdf = (token: string, contract: Pick<ContractOut, "id" | "contract_number">) =>
+  downloadAuthedPdf(
+    token,
+    `/api/v1/contracts/${contract.id}/pdf`,
+    `gghightech-agreement-${contract.contract_number ?? contract.id}.pdf`,
+  );
 
 // Only for PAID invoices — the API answers 409 otherwise.
 export const downloadReceiptPdf = (token: string, invoiceId: string) =>
