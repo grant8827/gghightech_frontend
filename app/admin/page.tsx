@@ -13,6 +13,7 @@ import {
   listProjects,
   type EstimateOut,
   type OrganizationOut,
+  type ProjectCreate,
   type ProjectOut,
   type StoredAuth,
 } from "@/lib/api";
@@ -158,10 +159,10 @@ function AdminDashboard({
     }
   }
 
-  async function handleCreateProject(orgId: string, title: string, slug: string) {
+  async function handleCreateProject(payload: ProjectCreate) {
     setNotice(null);
     try {
-      const project = await createProject(auth.token, { org_id: orgId, title, slug });
+      const project = await createProject(auth.token, payload);
       setNotice(`Project "${project.title}" created.`);
       await refresh();
       return project;

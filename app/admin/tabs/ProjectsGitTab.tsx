@@ -12,10 +12,10 @@ import {
   updateProject,
   type MilestoneOut,
   type OrganizationOut,
+  type ProjectCreate,
   type ProjectOut,
   type ProjectUpdateOut,
 } from "@/lib/api";
-import { Input, SubmitButton } from "@/components/LoginScreen";
 import { RecentWork } from "@/components/RecentWork";
 
 export function ProjectsGitTab({
@@ -29,14 +29,27 @@ export function ProjectsGitTab({
   token: string;
   orgs: OrganizationOut[];
   projects: ProjectOut[];
-  onCreateProject: (orgId: string, title: string, slug: string) => Promise<ProjectOut | null>;
+  onCreateProject: (payload: ProjectCreate) => Promise<ProjectOut | null>;
   onError: (e: unknown) => void;
   onProjectChanged: () => void;
 }) {
   const [selectedOrgId, setSelectedOrgId] = useState("");
   const [projectTitle, setProjectTitle] = useState("");
   const [projectSlug, setProjectSlug] = useState("");
+  // Until the slug is edited by hand, it follows the title.
+  const [slugEdited, setSlugEdited] = useState(false);
+  const [newRepoUrl, setNewRepoUrl] = useState("");
+  const [newLiveUrl, setNewLiveUrl] = useState("");
+  const [newStagingUrl, setNewStagingUrl] = useState("");
+  const [creating, setCreating] = useState(false);
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
+
+  const slugify = (t: string) =>
+    t
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80);
 
   async function handleCreateProject(e: React.FormEvent) {
     e.preventDefault();
@@ -44,57 +57,133 @@ export function ProjectsGitTab({
       onError(new Error("Select an organization first"));
       return;
     }
-    const project = await onCreateProject(selectedOrgId, projectTitle, projectSlug);
+    setCreating(true);
+    const project = await onCreateProject({
+      org_id: selectedOrgId,
+      title: projectTitle.trim(),
+      slug: projectSlug.trim(),
+      repository_url: newRepoUrl.trim() || undefined,
+      live_url: newLiveUrl.trim() || undefined,
+      staging_url: newStagingUrl.trim() || undefined,
+    });
+    setCreating(false);
     if (project) {
       setProjectTitle("");
       setProjectSlug("");
+      setSlugEdited(false);
+      setNewRepoUrl("");
+      setNewLiveUrl("");
+      setNewStagingUrl("");
+      // Open the new project's settings so milestones can be added next.
+      setExpandedProjectId(project.id);
     }
   }
+
+  const fieldClass = "mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white";
 
   return (
     <div>
       <h2 className="text-lg font-medium text-white">Projects &amp; Git</h2>
       <p className="mt-1 text-sm text-zinc-400">
-        Spin up a project, point it at a GitHub repo, and manage milestones and status updates.
+        Create a project with its GitHub repo and domain, then manage milestones and updates. Everything here shows
+        on the client&apos;s dashboard.
       </p>
 
-      <div className="glass-card mt-6 max-w-md rounded-2xl p-6">
+      <div className="glass-card mt-6 max-w-2xl rounded-2xl p-6">
         <h3 className="text-sm font-medium text-white">Create project</h3>
-        <p className="mt-1 text-xs text-zinc-500">
-          Org: {orgs.find((o) => o.id === selectedOrgId)?.name ?? "none — pick one below"}
-        </p>
-        <label className="mt-3 block text-sm text-zinc-300">
-          Organization
-          <select
-            value={selectedOrgId}
-            onChange={(e) => setSelectedOrgId(e.target.value)}
-            className="mt-1 w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white"
+        <form onSubmit={handleCreateProject} className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm text-zinc-300 sm:col-span-2">
+            Organization (client)
+            <select
+              value={selectedOrgId}
+              onChange={(e) => setSelectedOrgId(e.target.value)}
+              required
+              className={fieldClass}
+            >
+              <option value="">Select a client</option>
+              {orgs.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block text-sm text-zinc-300">
+            Title
+            <input
+              value={projectTitle}
+              onChange={(e) => {
+                setProjectTitle(e.target.value);
+                if (!slugEdited) setProjectSlug(slugify(e.target.value));
+              }}
+              required
+              placeholder="Acme website"
+              className={fieldClass}
+            />
+          </label>
+          <label className="block text-sm text-zinc-300">
+            Slug <span className="text-xs text-zinc-500">(short ID, auto-filled)</span>
+            <input
+              value={projectSlug}
+              onChange={(e) => {
+                setProjectSlug(e.target.value);
+                setSlugEdited(true);
+              }}
+              required
+              pattern="[a-z0-9-]+"
+              title="Lowercase letters, numbers and dashes"
+              placeholder="acme-website"
+              className={fieldClass}
+            />
+          </label>
+          <label className="block text-sm text-zinc-300 sm:col-span-2">
+            GitHub repository <span className="text-xs text-zinc-500">(optional)</span>
+            <input
+              value={newRepoUrl}
+              onChange={(e) => setNewRepoUrl(e.target.value)}
+              placeholder="https://github.com/owner/repo"
+              className={fieldClass}
+            />
+          </label>
+          <label className="block text-sm text-zinc-300">
+            Live domain <span className="text-xs text-zinc-500">(optional)</span>
+            <input
+              value={newLiveUrl}
+              onChange={(e) => setNewLiveUrl(e.target.value)}
+              placeholder="clientsite.com"
+              className={fieldClass}
+            />
+          </label>
+          <label className="block text-sm text-zinc-300">
+            Staging / preview URL <span className="text-xs text-zinc-500">(optional)</span>
+            <input
+              value={newStagingUrl}
+              onChange={(e) => setNewStagingUrl(e.target.value)}
+              placeholder="staging.clientsite.com"
+              className={fieldClass}
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={creating}
+            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-black transition-transform hover:scale-[1.01] disabled:opacity-50 sm:col-span-2"
           >
-            <option value="">— select —</option>
-            {orgs.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <form onSubmit={handleCreateProject} className="mt-3 space-y-3">
-          <Input label="Title" value={projectTitle} onChange={setProjectTitle} required />
-          <Input label="Slug" value={projectSlug} onChange={setProjectSlug} required />
-          <SubmitButton>Create project</SubmitButton>
+            {creating ? "Creating…" : "Create project"}
+          </button>
         </form>
       </div>
 
       <div className="mt-10">
         <h3 className="text-sm font-medium text-white">All projects</h3>
         <p className="mt-1 text-sm text-zinc-400">
-          Click a project to configure its repo, sync from GitHub, and manage milestones.
+          Click a project to edit its GitHub repo, domain and staging URL, sync from GitHub, and manage milestones.
         </p>
         <div className="mt-4 space-y-3">
           {projects.map((p) => (
             <div key={p.id} className="glass-card rounded-xl p-4">
               <button
                 onClick={() => setExpandedProjectId(expandedProjectId === p.id ? null : p.id)}
+                aria-expanded={expandedProjectId === p.id}
                 className="flex w-full flex-col gap-1 text-left sm:flex-row sm:items-center sm:justify-between"
               >
                 <div>
@@ -105,8 +194,13 @@ export function ProjectsGitTab({
                     <span className="ml-2 text-xs text-zinc-500">{p.repository_url.replace("https://github.com/", "")}</span>
                   )}
                 </div>
-                <div className="text-sm text-zinc-400">
-                  {p.status} · Health {p.health_score}
+                <div className="flex items-center gap-3 text-sm text-zinc-400">
+                  <span>
+                    {p.status} · Health {p.health_score}
+                  </span>
+                  <span className="rounded-full border border-white/15 px-2.5 py-0.5 text-xs text-zinc-300">
+                    {expandedProjectId === p.id ? "Close ▴" : "Repo, domain & milestones ▾"}
+                  </span>
                 </div>
               </button>
 

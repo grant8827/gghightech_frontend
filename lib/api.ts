@@ -297,7 +297,16 @@ export const listProjects = (token: string, orgId?: string) =>
 export const getProject = (token: string, projectId: string) =>
   request<ProjectOut>(`/api/v1/projects/${projectId}`, { token });
 
-export const createProject = (token: string, payload: { org_id: string; title: string; slug: string }) =>
+export type ProjectCreate = {
+  org_id: string;
+  title: string;
+  slug: string;
+  repository_url?: string;
+  live_url?: string;
+  staging_url?: string;
+};
+
+export const createProject = (token: string, payload: ProjectCreate) =>
   request<ProjectOut>("/api/v1/projects", {
     method: "POST",
     body: JSON.stringify(payload),
