@@ -1,41 +1,35 @@
 import Link from "next/link";
 import type { MilestoneOut, ProjectOut } from "@/lib/api";
+import {
+  ActivityColumns,
+  isDone,
+  isOverdue,
+  Meter,
+  MilestoneBars,
+  ScheduleStrip,
+  Sparkline,
+  StageTracker,
+  StatTile,
+  startOfToday,
+} from "@/components/ProjectCharts";
 import { RecentWork, SiteLinks } from "@/components/RecentWork";
 
-const STATUS_LABELS: Record<string, string> = {
-  PLANNED: "Planned",
-  IN_PROGRESS: "In progress",
-  COMPLETED: "Completed",
-  DISCOVERY: "Discovery",
-  QA: "Testing",
-  DELIVERED: "Delivered",
-};
+const sectionTitle = "text-xs font-medium uppercase tracking-[0.14em] text-zinc-500";
 
-function label(status: string) {
-  return STATUS_LABELS[status] ?? status.replace(/_/g, " ").toLowerCase().replace(/^\w/, (c) => c.toUpperCase());
-}
-
-export function ProgressBar({ value, label: name, large = false }: { value: number; label: string; large?: boolean }) {
-  const pct = Math.max(0, Math.min(100, Math.round(value)));
-  return (
-    <div
-      role="progressbar"
-      aria-label={name}
-      aria-valuenow={pct}
-      aria-valuemin={0}
-      aria-valuemax={100}
-      className={`w-full overflow-hidden rounded-full bg-white/10 ${large ? "h-3" : "h-1.5"}`}
-    >
-      <div
-        className={`h-full rounded-full transition-[width] duration-700 ${pct === 100 ? "bg-emerald-400" : "bg-accent"}`}
-        style={{ width: `${pct}%` }}
-      />
-    </div>
+function nextDeadline(projects: ProjectOut[], milestones: Record<string, MilestoneOut[]>) {
+  const today = startOfToday();
+  const open = projects.flatMap((p) =>
+    (milestones[p.id] ?? []).filter((m) => m.due_date && !isDone(m)).map((m) => ({ m, project: p })),
   );
+  const overdue = open.filter(({ m }) => isOverdue(m, today));
+  const upcoming = open
+    .filter(({ m }) => !isOverdue(m, today))
+    .sort((a, b) => a.m.due_date!.localeCompare(b.m.due_date!));
+  return { overdue, next: upcoming[0] ?? null };
 }
 
-// Every project the client's organization has, each with its overall
-// progress and a bar per milestone.
+// The client's "View projects" tab: a summary row, then one card per project
+// with its stage, completion, milestone chart, schedule and code activity.
 export function ProjectsTab({
   projects,
   milestones,
@@ -51,68 +45,130 @@ export function ProjectsTab({
     );
   }
 
+  const all = projects.flatMap((p) => milestones[p.id] ?? []);
+  const done = all.filter(isDone).length;
+  const avg = Math.round(projects.reduce((s, p) => s + p.overall_progress, 0) / projects.length);
+  const { overdue, next } = nextDeadline(projects, milestones);
+
+  // Weekly activity summed across projects (all share the same 12 weeks).
+  const activityWeeks = projects.map((p) => p.commit_activity?.weeks ?? []).filter((w) => w.length > 0);
+  const combined = activityWeeks.length
+    ? activityWeeks[0].map((_, i) => activityWeeks.reduce((s, w) => s + (w[i]?.commits ?? 0), 0))
+    : [];
+  const lastFour = combined.slice(-4).reduce((s, n) => s + n, 0);
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
+      <section aria-label="Summary" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile
+          label={projects.length > 1 ? "Average completion" : "Completion"}
+          value={`${avg}%`}
+          detail={`${projects.length} project${projects.length === 1 ? "" : "s"}`}
+        >
+          <Meter value={avg} label="Average completion" />
+        </StatTile>
+        <StatTile
+          label="Milestones done"
+          value={all.length ? `${done} of ${all.length}` : "—"}
+          detail={all.length ? `${all.length - done} still to go` : "None planned yet"}
+        />
+        <StatTile
+          label="Next deadline"
+          value={
+            next
+              ? new Date(`${next.m.due_date}T00:00:00`).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+              : "—"
+          }
+          detail={overdue.length ? `! ${overdue.length} past due` : next ? next.m.title : "No upcoming dates"}
+        />
+        {combined.length > 0 ? (
+          <StatTile label="Code updates, last 4 weeks" value={String(lastFour)}>
+            <Sparkline values={combined} label={`Code updates per week, last ${combined.length} weeks`} />
+          </StatTile>
+        ) : (
+          <StatTile
+            label="Projects launched"
+            value={String(projects.filter((p) => p.status === "DELIVERED").length)}
+            detail={`of ${projects.length}`}
+          />
+        )}
+      </section>
+
       {projects.map((p) => {
         const items = milestones[p.id] ?? [];
-        const done = items.filter((m) => m.progress_percentage === 100).length;
+        const hasActivity = (p.commit_activity?.weeks.length ?? 0) > 0;
+        const hasCommits = (p.recent_commits?.length ?? 0) > 0;
         return (
-          <section key={p.id} aria-labelledby={`project-${p.id}`} className="glass-card rounded-2xl p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 id={`project-${p.id}`} className="text-xl font-semibold text-white">
-                  {p.title}
-                </h2>
-                <p className="mt-1 text-xs text-zinc-500">
-                  {label(p.status)}
-                  {items.length > 0 && ` · ${done} of ${items.length} milestones complete`}
-                </p>
+          <section key={p.id} aria-labelledby={`project-${p.id}`} className="glass-card overflow-hidden rounded-3xl">
+            <div className="border-b border-white/10 p-6 sm:p-8">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="min-w-0">
+                  <h2 id={`project-${p.id}`} className="text-xl font-semibold text-white sm:text-2xl">
+                    {p.title}
+                  </h2>
+                  <div className="mt-3">
+                    <SiteLinks project={p} />
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-5xl font-semibold leading-none text-white">
+                    {p.overall_progress}
+                    <span className="text-2xl text-zinc-400">%</span>
+                  </p>
+                  <p className="mt-1 text-xs text-zinc-500">complete</p>
+                </div>
               </div>
-              <span className="text-3xl font-semibold tabular-nums text-accent">{p.overall_progress}%</span>
+              <div className="mt-6">
+                <Meter value={p.overall_progress} label={`${p.title} overall progress`} />
+              </div>
+              <div className="mt-8">
+                <StageTracker status={p.status} />
+              </div>
             </div>
 
-            <div className="mt-4">
-              <ProgressBar value={p.overall_progress} label={`${p.title} overall progress`} large />
+            <div className="grid gap-px bg-white/10 lg:grid-cols-[1.4fr_1fr]">
+              <div className="space-y-8 bg-[#0b0b0b] p-6 sm:p-8">
+                <div>
+                  <h3 className={sectionTitle}>Milestones</h3>
+                  <div className="mt-4">
+                    {items.length ? (
+                      <MilestoneBars milestones={items} />
+                    ) : (
+                      <p className="text-sm text-zinc-500">Milestones will appear here once they&apos;re planned.</p>
+                    )}
+                  </div>
+                </div>
+                {items.some((m) => m.due_date) && (
+                  <div>
+                    <h3 className={sectionTitle}>Schedule</h3>
+                    <div className="mt-4">
+                      <ScheduleStrip project={p} milestones={items} />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-8 bg-[#0b0b0b] p-6 sm:p-8">
+                {hasActivity && (
+                  <div>
+                    <h3 className={sectionTitle}>Development activity</h3>
+                    <div className="mt-3">
+                      <ActivityColumns project={p} />
+                    </div>
+                  </div>
+                )}
+                {hasCommits && <RecentWork project={p} limit={3} />}
+                {!hasActivity && !hasCommits && (
+                  <p className="text-sm text-zinc-500">Development activity will show here once work begins.</p>
+                )}
+              </div>
             </div>
 
-            {(p.live_url || p.staging_url) && (
-              <div className="mt-4">
-                <SiteLinks project={p} />
-              </div>
-            )}
-
-            {items.length > 0 && (
-              <ul className="mt-6 grid gap-x-8 gap-y-4 sm:grid-cols-2">
-                {items.map((m) => (
-                  <li key={m.id}>
-                    <div className="flex items-center justify-between gap-3 text-sm">
-                      <span className="truncate text-zinc-200">{m.title}</span>
-                      <span className="tabular-nums text-zinc-400">{m.progress_percentage}%</span>
-                    </div>
-                    <div className="mt-1.5">
-                      <ProgressBar value={m.progress_percentage} label={`${m.title} progress`} />
-                    </div>
-                    <div className="mt-1 flex items-center justify-between text-xs text-zinc-500">
-                      <span>{m.approved_at ? "Approved" : label(m.status)}</span>
-                      {m.due_date && <span>Due {new Date(`${m.due_date}T00:00:00`).toLocaleDateString()}</span>}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            {(p.recent_commits?.length ?? 0) > 0 && (
-              <div className="mt-6 border-t border-white/10 pt-5">
-                <RecentWork project={p} limit={3} />
-              </div>
-            )}
-
-            <Link
-              href={`/portal/${p.id}`}
-              className="mt-6 inline-block text-sm font-medium text-accent-light hover:underline"
-            >
-              Open project: preview, updates and approvals <span aria-hidden="true">→</span>
-            </Link>
+            <div className="flex justify-end border-t border-white/10 px-6 py-4 sm:px-8">
+              <Link href={`/portal/${p.id}`} className="text-sm font-medium text-accent-light hover:underline">
+                Preview, team updates &amp; approvals <span aria-hidden="true">→</span>
+              </Link>
+            </div>
           </section>
         );
       })}

@@ -269,6 +269,9 @@ export type ProjectOut = {
   // Newest first; refreshed by GitHub sync (on save, on demand, and every
   // 15 minutes in the background).
   recent_commits: CommitOut[] | null;
+  // Commits per week for the last 12 weeks (oldest first), from the same
+  // GitHub sync. capped: the window hit GitHub's 100-commit page.
+  commit_activity: { weeks: { start: string; commits: number }[]; capped: boolean } | null;
   overall_progress: number;
   created_at: string;
 };
