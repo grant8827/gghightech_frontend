@@ -31,6 +31,7 @@ import {
   StatTile,
   todayIso,
 } from "./ui";
+import { isNewlySigned } from "@/lib/signedContracts";
 
 const STATUS_LABEL: Record<string, string> = {
   DRAFT: "DRAFT",
@@ -46,11 +47,14 @@ export function ContractsPanel({
   token,
   projects,
   orgs,
+  seenBefore,
   onError,
 }: {
   token: string;
   projects: ProjectOut[];
   orgs: OrganizationOut[];
+  // Signed after this (ISO time) = marked NEW.
+  seenBefore: string;
   onError: (e: unknown) => void;
 }) {
   const [contracts, setContracts] = useState<ContractOut[]>([]);
@@ -151,6 +155,9 @@ export function ContractsPanel({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-xs text-zinc-400">{c.contract_number}</span>
                       <Chip label={STATUS_LABEL[c.status]} />
+                      {isNewlySigned(c, seenBefore) && (
+                        <span className="rounded-full bg-emerald-400 px-2 py-0.5 text-[10px] font-bold text-black">NEW</span>
+                      )}
                     </div>
                     <p className="mt-1 truncate text-sm font-medium text-white">{c.title}</p>
                     <p className="mt-0.5 truncate text-xs text-zinc-500">

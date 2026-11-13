@@ -7,6 +7,7 @@ import {
   createProject,
   emailServerStatus,
   getUnreadMessageCount,
+  listContracts,
   inviteUser,
   listEstimates,
   listOrganizations,
@@ -18,6 +19,7 @@ import {
   type StoredAuth,
 } from "@/lib/api";
 import { AuthGate, STAFF_ROLES } from "@/components/AuthGate";
+import { isNewlySigned, markSignedSeen, signedSeenAt } from "@/lib/signedContracts";
 import { ClientsTab } from "./tabs/ClientsTab";
 import { EstimatesTab } from "./tabs/EstimatesTab";
 import { InvoicingTab } from "./tabs/InvoicingTab";
@@ -94,6 +96,9 @@ function AdminDashboard({
   // PROJECT_MANAGER can read messages; for other roles it stays 0.
   const [unreadMessages, setUnreadMessages] = useState(0);
   const canReadMessages = auth.role === "SUPER_ADMIN" || auth.role === "PROJECT_MANAGER";
+  // Contracts signed since this browser last opened Invoicing / Contracts →
+  // Contracts. Badge on that tab; see lib/signedContracts.ts.
+  const [newlySigned, setNewlySigned] = useState(0);
 
   function handleError(e: unknown, fallback: string) {
     if (e instanceof ApiError) {
@@ -122,6 +127,19 @@ function AdminDashboard({
       handleError(e, "Could not reach the API");
     }
   }
+
+  useEffect(() => {
+    const loadSigned = () =>
+      listContracts(auth.token)
+        .then((cs) => {
+          const seen = signedSeenAt();
+          setNewlySigned(cs.filter((c) => isNewlySigned(c, seen)).length);
+        })
+        .catch(() => {}); // best-effort badge
+    loadSigned();
+    const timer = window.setInterval(loadSigned, 60_000);
+    return () => window.clearInterval(timer);
+  }, [auth.token]);
 
   useEffect(() => {
     // Fetch-on-mount: refresh() sets state only after its awaits resolve,
@@ -206,6 +224,15 @@ function AdminDashboard({
                 <span className="ml-2 rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold leading-none text-black">
                   {unreadMessages}
                   <span className="sr-only"> unread</span>
+                </span>
+              )}
+              {tab.id === "invoicing" && newlySigned > 0 && (
+                <span
+                  title={`${newlySigned} contract${newlySigned === 1 ? "" : "s"} newly signed`}
+                  className="ml-2 rounded-full bg-emerald-400 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-black"
+                >
+                  ✓ {newlySigned}
+                  <span className="sr-only"> newly signed</span>
                 </span>
               )}
             </button>
@@ -311,6 +338,11 @@ function AdminDashboard({
               token={auth.token}
               projects={projects}
               orgs={orgs}
+              newlySigned={newlySigned}
+              onContractsSeen={() => {
+                markSignedSeen();
+                setNewlySigned(0);
+              }}
               onError={(e) => handleError(e, "Request failed")}
             />
           )}

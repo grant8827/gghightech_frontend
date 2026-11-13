@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { signedSeenAt } from "@/lib/signedContracts";
 import type { OrganizationOut, ProjectOut } from "@/lib/api";
 import { ContractsPanel } from "./invoicing/ContractsPanel";
 import { InvoicesPanel } from "./invoicing/InvoicesPanel";
@@ -19,14 +20,29 @@ export function InvoicingTab({
   token,
   projects,
   orgs,
+  newlySigned,
+  onContractsSeen,
   onError,
 }: {
   token: string;
   projects: ProjectOut[];
   orgs: OrganizationOut[];
+  // Contracts signed since this browser last looked (badge from the admin
+  // page); opening Contracts marks them seen.
+  newlySigned: number;
+  onContractsSeen: () => void;
   onError: (e: unknown) => void;
 }) {
-  const [view, setView] = useState<View>("invoices");
+  // Newly signed contracts? Open straight on Contracts.
+  const [view, setView] = useState<View>(newlySigned > 0 ? "contracts" : "invoices");
+  // When Contracts was last seen *before* this visit, so the panel can mark
+  // which signed contracts are new even after the badge clears.
+  const [seenBefore] = useState(signedSeenAt);
+
+  useEffect(() => {
+    if (view === "contracts") onContractsSeen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view]);
 
   return (
     <div>
@@ -47,6 +63,12 @@ export function InvoicingTab({
             }`}
           >
             {v.label}
+            {v.id === "contracts" && newlySigned > 0 && (
+              <span className="ml-2 rounded-full bg-emerald-400 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-black">
+                ✓ {newlySigned}
+                <span className="sr-only"> newly signed</span>
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -55,7 +77,7 @@ export function InvoicingTab({
         {view === "invoices" ? (
           <InvoicesPanel token={token} projects={projects} orgs={orgs} onError={onError} />
         ) : (
-          <ContractsPanel token={token} projects={projects} orgs={orgs} onError={onError} />
+          <ContractsPanel token={token} projects={projects} orgs={orgs} seenBefore={seenBefore} onError={onError} />
         )}
       </div>
     </div>
