@@ -392,7 +392,8 @@ export const createMilestone = (
 export const updateMilestone = (
   token: string,
   milestoneId: string,
-  payload: { progress_percentage?: number; status?: string; due_date?: string; amount?: number },
+  // due_date: "YYYY-MM-DD", or null to clear it.
+  payload: { progress_percentage?: number; status?: string; due_date?: string | null; amount?: number },
 ) =>
   request<MilestoneOut>(`/api/v1/milestones/${milestoneId}`, {
     method: "PATCH",

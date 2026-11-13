@@ -231,7 +231,8 @@ const STAGES = [
   { id: "DELIVERED", label: "Launched" },
 ] as const;
 
-type MilestoneDraft = { progress_percentage: string; amount: string; status: string };
+// due_date is "YYYY-MM-DD" (a date input's value) or "" for none.
+type MilestoneDraft = { progress_percentage: string; amount: string; status: string; due_date: string };
 
 function ProjectGitPanel({
   token,
@@ -253,6 +254,7 @@ function ProjectGitPanel({
 
   const [newTitle, setNewTitle] = useState("");
   const [newAmount, setNewAmount] = useState("");
+  const [newDueDate, setNewDueDate] = useState("");
   const [updateMessage, setUpdateMessage] = useState("");
 
   const [repoUrl, setRepoUrl] = useState(project.repository_url ?? "");
@@ -275,6 +277,7 @@ function ProjectGitPanel({
             {
               progress_percentage: String(ms.progress_percentage),
               amount: ms.amount != null ? String(ms.amount) : "",
+              due_date: ms.due_date ?? "",
               status: ms.status,
             },
           ]),
@@ -302,6 +305,8 @@ function ProjectGitPanel({
         progress_percentage: Number(draft.progress_percentage),
         status: draft.status,
         amount: draft.amount ? Number(draft.amount) : undefined,
+        // Empty clears the date.
+        due_date: draft.due_date || null,
       });
       await refresh();
     } catch (e) {
@@ -319,9 +324,11 @@ function ProjectGitPanel({
         project_id: project.id,
         title: newTitle,
         amount: newAmount ? Number(newAmount) : undefined,
+        due_date: newDueDate || undefined,
       });
       setNewTitle("");
       setNewAmount("");
+      setNewDueDate("");
       await refresh();
     } catch (e) {
       onError(e);
@@ -545,7 +552,7 @@ function ProjectGitPanel({
         <h3 className="text-sm font-medium text-zinc-300">Milestones</h3>
         <ul className="mt-2 space-y-2">
           {milestones.map((m) => {
-            const draft = drafts[m.id] ?? { progress_percentage: "0", amount: "", status: m.status };
+            const draft = drafts[m.id] ?? { progress_percentage: "0", amount: "", status: m.status, due_date: "" };
             return (
               <li
                 key={m.id}
@@ -574,6 +581,16 @@ function ProjectGitPanel({
                     </option>
                   ))}
                 </select>
+                <label className="flex items-center gap-1 text-xs text-zinc-500">
+                  Due
+                  <input
+                    type="date"
+                    value={draft.due_date}
+                    onChange={(e) => setDrafts((d) => ({ ...d, [m.id]: { ...draft, due_date: e.target.value } }))}
+                    aria-label={`${m.title} due date`}
+                    className="rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white [color-scheme:dark]"
+                  />
+                </label>
                 <input
                   type="number"
                   placeholder="Amount $"
@@ -602,6 +619,15 @@ function ProjectGitPanel({
               onChange={(e) => setNewTitle(e.target.value)}
               required
               className="mt-1 block w-48 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400">
+            Due date <span className="text-zinc-600">(optional)</span>
+            <input
+              type="date"
+              value={newDueDate}
+              onChange={(e) => setNewDueDate(e.target.value)}
+              className="mt-1 block rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white [color-scheme:dark]"
             />
           </label>
           <label className="text-xs text-zinc-400">
