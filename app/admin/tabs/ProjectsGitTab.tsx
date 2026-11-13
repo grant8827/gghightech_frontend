@@ -196,7 +196,7 @@ export function ProjectsGitTab({
                 </div>
                 <div className="flex items-center gap-3 text-sm text-zinc-400">
                   <span>
-                    {p.status} · Health {p.health_score}
+                    {STAGES.find((st) => st.id === p.status)?.label ?? p.status} · Health {p.health_score}
                   </span>
                   <span className="rounded-full border border-white/15 px-2.5 py-0.5 text-xs text-zinc-300">
                     {expandedProjectId === p.id ? "Close ▴" : "Repo, domain & milestones ▾"}
@@ -221,6 +221,15 @@ export function ProjectsGitTab({
 }
 
 const MILESTONE_STATUSES = ["PLANNED", "IN_PROGRESS", "COMPLETED"];
+
+// The client dashboard's stage tracker (components/ProjectCharts.tsx), in
+// order. A project's status is the furthest stage it has reached.
+const STAGES = [
+  { id: "DISCOVERY", label: "Discovery" },
+  { id: "IN_PROGRESS", label: "Build" },
+  { id: "QA", label: "Testing" },
+  { id: "DELIVERED", label: "Launched" },
+] as const;
 
 type MilestoneDraft = { progress_percentage: string; amount: string; status: string };
 
@@ -250,6 +259,7 @@ function ProjectGitPanel({
   const [stagingUrl, setStagingUrl] = useState(project.staging_url ?? "");
   const [liveUrl, setLiveUrl] = useState(project.live_url ?? "");
   const [syncFailed, setSyncFailed] = useState(false);
+  const [stageMessage, setStageMessage] = useState<string | null>(null);
   const [jiraKey, setJiraKey] = useState(project.jira_project_key ?? "");
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
@@ -335,6 +345,27 @@ function ProjectGitPanel({
     }
   }
 
+  async function handleStageToggle(index: number, checked: boolean) {
+    // Ticking a stage marks it and everything before it as reached;
+    // unticking it steps back to the stage before. Discovery is the start
+    // and can't be unticked.
+    const target = checked ? index : index - 1;
+    const status = STAGES[Math.max(0, target)].id;
+    if (status === projectDetail.status) return;
+    setBusyId("stage");
+    setStageMessage(null);
+    try {
+      const updated = await updateProject(token, project.id, { status });
+      setProjectDetail(updated);
+      setStageMessage(`Saved. The client now sees “${STAGES[Math.max(0, target)].label}”.`);
+      onProjectChanged();
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   async function syncNow(): Promise<ProjectOut | null> {
     try {
       const updated = await syncProjectGithub(token, project.id);
@@ -394,6 +425,43 @@ function ProjectGitPanel({
 
   return (
     <div className="mt-4 space-y-6 border-t border-white/10 pt-4">
+      <fieldset>
+        <legend className="text-sm font-medium text-zinc-300">Project stage</legend>
+        <p className="mt-1 text-xs text-zinc-500">
+          Tick each stage as the project reaches it. The client&apos;s dashboard updates straight away.
+        </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {STAGES.map((stage, i) => {
+            const reached = Math.max(0, STAGES.findIndex((st) => st.id === projectDetail.status));
+            const checked = i <= reached;
+            const locked = i === 0;
+            return (
+              <label
+                key={stage.id}
+                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                  checked ? "border-accent/50 bg-accent/10 text-white" : "border-white/10 text-zinc-400 hover:border-white/30"
+                } ${locked || busyId === "stage" ? "cursor-default" : "cursor-pointer"}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  disabled={locked || busyId === "stage"}
+                  onChange={(e) => handleStageToggle(i, e.target.checked)}
+                  className="h-4 w-4 accent-[#e8b84b]"
+                />
+                <span className="text-xs text-zinc-500">{i + 1}.</span>
+                {stage.label}
+              </label>
+            );
+          })}
+        </div>
+        {stageMessage && (
+          <p role="status" className="mt-2 text-xs text-zinc-400">
+            {stageMessage}
+          </p>
+        )}
+      </fieldset>
+
       <div>
         <h3 className="text-sm font-medium text-zinc-300">Git repository &amp; domain</h3>
         <p className="mt-1 text-xs text-zinc-500">
