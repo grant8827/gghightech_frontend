@@ -1,7 +1,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createInvoice, listInvoices, markInvoicePaid, type InvoiceOut, type ProjectOut } from "@/lib/api";
+import {
+  createInvoice,
+  downloadReceiptPdf,
+  listInvoices,
+  markInvoicePaid,
+  PAYMENT_METHOD_LABELS,
+  type InvoiceOut,
+  type PaymentMethod,
+  type ProjectOut,
+} from "@/lib/api";
+
+type RecordedMethod = Exclude<PaymentMethod, "CARD">;
+const RECORDED_METHODS: RecordedMethod[] = ["CHECK", "WIRE", "CASH", "OTHER"];
 
 export function InvoicingTab({
   token,
@@ -15,6 +27,10 @@ export function InvoicingTab({
   const [invoices, setInvoices] = useState<InvoiceOut[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
+  // The invoice whose "record payment" form is open, and its fields.
+  const [recordingId, setRecordingId] = useState<string | null>(null);
+  const [method, setMethod] = useState<RecordedMethod>("CHECK");
+  const [reference, setReference] = useState("");
 
   const [projectId, setProjectId] = useState(projects[0]?.id ?? "");
   const [description, setDescription] = useState("");
@@ -36,10 +52,29 @@ export function InvoicingTab({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function handleMarkPaid(id: string) {
+  function startRecording(id: string) {
+    setRecordingId(id);
+    setMethod("CHECK");
+    setReference("");
+  }
+
+  async function handleDownloadReceipt(id: string) {
+    setBusyId(`receipt-${id}`);
+    try {
+      await downloadReceiptPdf(token, id);
+    } catch (e) {
+      onError(e);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleMarkPaid(e: React.FormEvent, id: string) {
+    e.preventDefault();
     setBusyId(id);
     try {
-      await markInvoicePaid(token, id);
+      await markInvoicePaid(token, id, { payment_method: method, payment_reference: reference.trim() || undefined });
+      setRecordingId(null);
       await refresh();
     } catch (e) {
       onError(e);
@@ -139,14 +174,71 @@ export function InvoicingTab({
                 {inv.status}
                 {inv.description && <span className="text-zinc-500"> — {inv.description}</span>}
               </span>
-              {inv.status === "PENDING" && (
+              {inv.status === "PAID" && (
+                <span className="flex items-center gap-3 text-xs text-zinc-500">
+                  {PAYMENT_METHOD_LABELS[inv.payment_method ?? "OTHER"]}
+                  {inv.payment_method !== "CARD" && inv.payment_reference && ` ${inv.payment_reference}`}
+                  <button
+                    onClick={() => handleDownloadReceipt(inv.id)}
+                    disabled={busyId === `receipt-${inv.id}`}
+                    className="rounded-full border border-white/15 px-3 py-1 text-zinc-200 hover:border-accent/50 disabled:opacity-50"
+                  >
+                    Receipt PDF
+                  </button>
+                </span>
+              )}
+              {inv.status === "PENDING" && recordingId !== inv.id && (
                 <button
-                  onClick={() => handleMarkPaid(inv.id)}
-                  disabled={busyId === inv.id}
-                  className="rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-200 hover:border-accent/50 disabled:opacity-50"
+                  onClick={() => startRecording(inv.id)}
+                  className="rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-200 hover:border-accent/50"
                 >
-                  {busyId === inv.id ? "…" : "Mark Paid"}
+                  Record payment
                 </button>
+              )}
+              {inv.status === "PENDING" && recordingId === inv.id && (
+                <form
+                  onSubmit={(e) => handleMarkPaid(e, inv.id)}
+                  className="flex w-full flex-wrap items-end gap-2 border-t border-white/10 pt-3"
+                >
+                  <label className="text-xs text-zinc-400">
+                    Paid by
+                    <select
+                      value={method}
+                      onChange={(e) => setMethod(e.target.value as RecordedMethod)}
+                      className="mt-1 block rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white"
+                    >
+                      {RECORDED_METHODS.map((m) => (
+                        <option key={m} value={m}>
+                          {m === "OTHER" ? "Other" : PAYMENT_METHOD_LABELS[m]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="text-xs text-zinc-400">
+                    Reference <span className="text-zinc-600">(optional)</span>
+                    <input
+                      value={reference}
+                      onChange={(e) => setReference(e.target.value)}
+                      maxLength={120}
+                      placeholder="Check # or transfer ref"
+                      className="mt-1 block rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={busyId === inv.id}
+                    className="rounded-full bg-accent px-3 py-1.5 text-xs font-medium text-black disabled:opacity-50"
+                  >
+                    {busyId === inv.id ? "Saving…" : "Mark paid & issue receipt"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRecordingId(null)}
+                    className="rounded-full px-3 py-1.5 text-xs text-zinc-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                </form>
               )}
             </li>
           ))}

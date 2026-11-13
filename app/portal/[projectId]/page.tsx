@@ -7,7 +7,8 @@ import {
   ApiError,
   approveMilestone,
   getProject,
-  invoicePdfUrl,
+  downloadInvoicePdf,
+  downloadReceiptPdf,
   listInvoices,
   listMilestones,
   listProjectUpdates,
@@ -137,6 +138,22 @@ function ProjectDetail({ auth, onSessionExpired }: { auth: StoredAuth; onSession
     }
   }
 
+  async function handleDownload(key: string, download: () => Promise<void>) {
+    setBusyId(key);
+    setError(null);
+    try {
+      await download();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        onSessionExpired();
+        return;
+      }
+      setError(e instanceof ApiError ? e.message : "Could not download the PDF");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (!project) {
     return (
       <div className="mx-auto max-w-5xl px-6 py-16">
@@ -152,7 +169,7 @@ function ProjectDetail({ auth, onSessionExpired }: { auth: StoredAuth; onSession
   return (
     <div className="mx-auto max-w-5xl px-6 py-16">
       <Link href="/portal" className="text-xs text-zinc-500 hover:text-zinc-300">
-        ← All projects
+        ← Dashboard
       </Link>
 
       <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -226,7 +243,12 @@ function ProjectDetail({ auth, onSessionExpired }: { auth: StoredAuth; onSession
 
       <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-2">
         <div className="glass-card rounded-2xl p-6">
-          <h2 className="text-lg font-medium text-white">Invoices</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-medium text-white">Invoices</h2>
+            <Link href="/portal?tab=payments" className="text-xs text-accent-light hover:underline">
+              All payments &amp; receipts →
+            </Link>
+          </div>
           <ul className="mt-4 space-y-3">
             {invoices.map((inv) => (
               <li key={inv.id} className="flex flex-col gap-2 rounded-xl border border-white/10 p-3 sm:flex-row sm:items-center sm:justify-between">
@@ -241,9 +263,22 @@ function ProjectDetail({ auth, onSessionExpired }: { auth: StoredAuth; onSession
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs">
-                  <a href={invoicePdfUrl(inv.id)} target="_blank" rel="noreferrer" className="text-accent-light underline">
-                    PDF
-                  </a>
+                  <button
+                    onClick={() => handleDownload(`pdf-${inv.id}`, () => downloadInvoicePdf(auth.token, inv.id))}
+                    disabled={busyId === `pdf-${inv.id}`}
+                    className="text-accent-light underline disabled:opacity-50"
+                  >
+                    Invoice PDF
+                  </button>
+                  {inv.status === "PAID" && (
+                    <button
+                      onClick={() => handleDownload(`receipt-${inv.id}`, () => downloadReceiptPdf(auth.token, inv.id))}
+                      disabled={busyId === `receipt-${inv.id}`}
+                      className="text-accent-light underline disabled:opacity-50"
+                    >
+                      Receipt
+                    </button>
+                  )}
                   {inv.status === "PENDING" && isClientAdmin && (
                     <button
                       onClick={() => handlePay(inv.id)}

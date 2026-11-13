@@ -394,7 +394,24 @@ export type InvoiceOut = {
   customer_email: string | null;
   created_at: string;
   paid_at: string | null;
+  // Set once PAID: CARD when the client paid online through Stripe;
+  // otherwise how staff recorded it (see markInvoicePaid).
+  payment_method: PaymentMethod | null;
+  payment_reference: string | null;
 };
+
+export type PaymentMethod = "CARD" | "CHECK" | "WIRE" | "CASH" | "OTHER";
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  CARD: "Card (paid online)",
+  CHECK: "Check",
+  WIRE: "Bank transfer / wire",
+  CASH: "Cash",
+  OTHER: "Recorded by GG HighTech",
+};
+
+// Matches the number printed on the receipt PDF (app/services/pdf.py).
+export const receiptNumber = (invoiceId: string) => `R-${invoiceId.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 
 export const approveMilestone = (token: string, milestoneId: string) =>
   request<InvoiceOut>(`/api/v1/milestones/${milestoneId}/approve`, { method: "POST", token });
@@ -413,13 +430,46 @@ export const createInvoice = (
     token,
   });
 
-export const invoicePdfUrl = (id: string) => `${API_URL}/api/v1/invoices/${id}/pdf`;
+// Invoice and receipt PDFs need the session token, which a plain <a href>
+// can't send — so fetch with the header and hand the browser a blob.
+async function downloadAuthedPdf(token: string, path: string, filename: string): Promise<void> {
+  const res = await fetch(`${API_URL}${path}`, { headers: { Authorization: `Bearer ${token}` } });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new ApiError(res.status, body.detail ?? "Could not download the PDF");
+  }
+  const url = URL.createObjectURL(await res.blob());
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+export const downloadInvoicePdf = (token: string, invoiceId: string) =>
+  downloadAuthedPdf(token, `/api/v1/invoices/${invoiceId}/pdf`, `gghightech-invoice-${invoiceId}.pdf`);
+
+// Only for PAID invoices — the API answers 409 otherwise.
+export const downloadReceiptPdf = (token: string, invoiceId: string) =>
+  downloadAuthedPdf(token, `/api/v1/invoices/${invoiceId}/receipt`, `gghightech-receipt-${receiptNumber(invoiceId)}.pdf`);
 
 export const payInvoice = (token: string, invoiceId: string) =>
   request<{ checkout_url: string }>(`/api/v1/invoices/${invoiceId}/pay`, { method: "POST", token });
 
-export const markInvoicePaid = (token: string, invoiceId: string) =>
-  request<InvoiceOut>(`/api/v1/invoices/${invoiceId}/mark-paid`, { method: "PATCH", token });
+// Staff-only: a payment made outside Stripe. CARD is reserved for the
+// Stripe webhook.
+export const markInvoicePaid = (
+  token: string,
+  invoiceId: string,
+  payload: { payment_method: Exclude<PaymentMethod, "CARD">; payment_reference?: string } = { payment_method: "OTHER" },
+) =>
+  request<InvoiceOut>(`/api/v1/invoices/${invoiceId}/mark-paid`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    token,
+  });
 
 // One-time payment path — this invoice is never a SubscriptionPlan. Staff-
 // initiated (unlike payInvoice above, which is the client's own self-serve
