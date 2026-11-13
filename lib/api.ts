@@ -264,8 +264,21 @@ export type ProjectOut = {
   jira_issue_count: number | null;
   jira_done_count: number | null;
   jira_synced_at: string | null;
+  // The client's real website; staging_url above is the preview.
+  live_url: string | null;
+  // Newest first; refreshed by GitHub sync (on save, on demand, and every
+  // 15 minutes in the background).
+  recent_commits: CommitOut[] | null;
   overall_progress: number;
   created_at: string;
+};
+
+export type CommitOut = {
+  sha: string;
+  message: string;
+  author: string | null;
+  committed_at: string | null;
+  url: string | null;
 };
 
 export const listOrganizations = (token: string) =>
@@ -296,13 +309,15 @@ export const createProject = (token: string, payload: { org_id: string; title: s
 export const updateProject = (
   token: string,
   projectId: string,
+  // For the URL fields, "" or null clears the value.
   payload: Partial<{
     title: string;
     status: string;
     budget_estimate: number;
-    staging_url: string;
-    repository_url: string;
-    jira_project_key: string;
+    staging_url: string | null;
+    live_url: string | null;
+    repository_url: string | null;
+    jira_project_key: string | null;
   }>,
 ) =>
   request<ProjectOut>(`/api/v1/projects/${projectId}`, {

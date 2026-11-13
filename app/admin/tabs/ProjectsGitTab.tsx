@@ -16,6 +16,7 @@ import {
   type ProjectUpdateOut,
 } from "@/lib/api";
 import { Input, SubmitButton } from "@/components/LoginScreen";
+import { RecentWork } from "@/components/RecentWork";
 
 export function ProjectsGitTab({
   token,
@@ -99,6 +100,10 @@ export function ProjectsGitTab({
                 <div>
                   <span className="text-sm font-medium text-white">{p.title}</span>
                   <span className="ml-2 text-xs text-zinc-500">{p.slug}</span>
+                  {p.live_url && <span className="ml-2 text-xs text-emerald-300/80">{p.live_url.replace(/^https?:\/\//, "")}</span>}
+                  {p.repository_url && (
+                    <span className="ml-2 text-xs text-zinc-500">{p.repository_url.replace("https://github.com/", "")}</span>
+                  )}
                 </div>
                 <div className="text-sm text-zinc-400">
                   {p.status} · Health {p.health_score}
@@ -149,6 +154,8 @@ function ProjectGitPanel({
 
   const [repoUrl, setRepoUrl] = useState(project.repository_url ?? "");
   const [stagingUrl, setStagingUrl] = useState(project.staging_url ?? "");
+  const [liveUrl, setLiveUrl] = useState(project.live_url ?? "");
+  const [syncFailed, setSyncFailed] = useState(false);
   const [jiraKey, setJiraKey] = useState(project.jira_project_key ?? "");
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
@@ -234,19 +241,43 @@ function ProjectGitPanel({
     }
   }
 
+  async function syncNow(): Promise<ProjectOut | null> {
+    try {
+      const updated = await syncProjectGithub(token, project.id);
+      setProjectDetail(updated);
+      setSyncFailed(false);
+      return updated;
+    } catch (e) {
+      setSyncFailed(true);
+      setSyncMessage(`GitHub sync failed: ${e instanceof ApiError ? e.message : "could not reach the API"}`);
+      return null;
+    }
+  }
+
   async function handleSaveRepoSettings(e: React.FormEvent) {
     e.preventDefault();
     setBusyId("repo-settings");
     setSyncMessage(null);
+    setSyncFailed(false);
     try {
+      // Blank sends null, which clears the field.
       const updated = await updateProject(token, project.id, {
-        repository_url: repoUrl || undefined,
-        staging_url: stagingUrl || undefined,
-        jira_project_key: jiraKey || undefined,
+        repository_url: repoUrl.trim() || null,
+        live_url: liveUrl.trim() || null,
+        staging_url: stagingUrl.trim() || null,
+        jira_project_key: jiraKey.trim() || null,
       });
       setProjectDetail(updated);
-      onProjectChanged();
+      // Show the cleaned-up values the server stored (e.g. https:// added).
+      setRepoUrl(updated.repository_url ?? "");
+      setLiveUrl(updated.live_url ?? "");
+      setStagingUrl(updated.staging_url ?? "");
       setSyncMessage("Saved.");
+      if (updated.repository_url) {
+        const synced = await syncNow();
+        if (synced) setSyncMessage(`Saved and synced ${synced.recent_commits?.length ?? 0} recent commits.`);
+      }
+      onProjectChanged();
     } catch (e) {
       onError(e);
     } finally {
@@ -257,16 +288,12 @@ function ProjectGitPanel({
   async function handleSyncGithub() {
     setBusyId("sync-github");
     setSyncMessage(null);
-    try {
-      const updated = await syncProjectGithub(token, project.id);
-      setProjectDetail(updated);
+    const synced = await syncNow();
+    if (synced) {
+      setSyncMessage(`Synced: ${synced.latest_commit_sha?.slice(0, 7)} ${synced.latest_commit_message ?? ""}`);
       onProjectChanged();
-      setSyncMessage(`Synced: ${updated.latest_commit_sha?.slice(0, 7)} — ${updated.latest_commit_message}`);
-    } catch (e) {
-      setSyncMessage(e instanceof ApiError ? e.message : "Could not reach the API");
-    } finally {
-      setBusyId(null);
     }
+    setBusyId(null);
   }
 
   if (loading) return <p className="mt-4 text-sm text-zinc-500">Loading…</p>;
@@ -274,63 +301,82 @@ function ProjectGitPanel({
   return (
     <div className="mt-4 space-y-6 border-t border-white/10 pt-4">
       <div>
-        <h3 className="text-sm font-medium text-zinc-300">Repository &amp; Integrations</h3>
-        <form onSubmit={handleSaveRepoSettings} className="mt-2 flex flex-wrap items-end gap-2">
+        <h3 className="text-sm font-medium text-zinc-300">Git repository &amp; domain</h3>
+        <p className="mt-1 text-xs text-zinc-500">
+          Shown on the client&apos;s dashboard. The repo&apos;s latest commits appear there as &ldquo;Latest from our
+          developers&rdquo; and refresh automatically every 15 minutes.
+        </p>
+        <form onSubmit={handleSaveRepoSettings} className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="text-xs text-zinc-400">
-            Repository URL
+            GitHub repository
             <input
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
               placeholder="https://github.com/owner/repo"
-              className="mt-1 block w-56 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+              className="mt-1 block w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white"
             />
           </label>
           <label className="text-xs text-zinc-400">
-            Staging URL
+            Live domain
+            <input
+              value={liveUrl}
+              onChange={(e) => setLiveUrl(e.target.value)}
+              placeholder="clientsite.com"
+              className="mt-1 block w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white"
+            />
+          </label>
+          <label className="text-xs text-zinc-400">
+            Staging / preview URL
             <input
               value={stagingUrl}
               onChange={(e) => setStagingUrl(e.target.value)}
-              placeholder="https://staging.example.com"
-              className="mt-1 block w-56 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+              placeholder="https://staging.clientsite.com"
+              className="mt-1 block w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white"
             />
           </label>
           <label className="text-xs text-zinc-400">
-            Jira project key
+            Jira project key <span className="text-zinc-600">(optional)</span>
             <input
               value={jiraKey}
               onChange={(e) => setJiraKey(e.target.value)}
               placeholder="ALPHA"
-              className="mt-1 block w-28 rounded border border-white/10 bg-white/5 px-2 py-1 text-sm text-white"
+              className="mt-1 block w-full rounded border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white"
             />
           </label>
-          <button
-            type="submit"
-            disabled={busyId === "repo-settings"}
-            className="rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-200 hover:border-accent/50 disabled:opacity-50"
-          >
-            {busyId === "repo-settings" ? "Saving…" : "Save"}
-          </button>
+          <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+            <button
+              type="submit"
+              disabled={busyId === "repo-settings"}
+              className="rounded-full bg-accent px-4 py-1.5 text-xs font-medium text-black disabled:opacity-50"
+            >
+              {busyId === "repo-settings" ? "Saving…" : "Save & sync"}
+            </button>
+            <button
+              type="button"
+              onClick={handleSyncGithub}
+              disabled={busyId !== null || !projectDetail.repository_url}
+              className="rounded-full border border-white/15 px-3 py-1.5 text-xs text-zinc-200 hover:border-accent/50 disabled:opacity-50"
+            >
+              {busyId === "sync-github" ? "Syncing…" : "Sync from GitHub now"}
+            </button>
+            {syncMessage && (
+              <span role="status" className={`text-xs ${syncFailed ? "text-red-300" : "text-zinc-400"}`}>
+                {syncMessage}
+              </span>
+            )}
+          </div>
         </form>
 
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          <button
-            onClick={handleSyncGithub}
-            disabled={busyId === "sync-github"}
-            className="rounded-full border border-white/15 px-3 py-1 text-xs text-zinc-200 hover:border-accent/50 disabled:opacity-50"
-          >
-            {busyId === "sync-github" ? "Syncing…" : "Sync from GitHub"}
-          </button>
-          {syncMessage && <span className="text-xs text-zinc-400">{syncMessage}</span>}
-        </div>
-
-        <div className="mt-2 flex flex-wrap gap-4 text-xs text-zinc-500">
-          {projectDetail.latest_commit_sha && (
-            <span>
-              Latest commit: <code className="text-zinc-300">{projectDetail.latest_commit_sha.slice(0, 7)}</code>{" "}
-              {projectDetail.latest_commit_message}
-            </span>
-          )}
-        </div>
+        {(projectDetail.recent_commits?.length ?? 0) > 0 ? (
+          <div className="mt-4 rounded-lg border border-white/10 p-3">
+            <p className="mb-2 text-xs text-zinc-500">What the client sees:</p>
+            <RecentWork project={projectDetail} limit={3} />
+          </div>
+        ) : (
+          projectDetail.repository_url && (
+            <p className="mt-3 text-xs text-zinc-500">No commits synced yet.</p>
+          )
+        )}
       </div>
 
       <div>

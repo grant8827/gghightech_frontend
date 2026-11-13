@@ -16,7 +16,7 @@ import {
   type ProjectOut,
   type StoredAuth,
 } from "@/lib/api";
-import { AuthGate } from "@/components/AuthGate";
+import { AuthGate, STAFF_ROLES } from "@/components/AuthGate";
 import { ClientsTab } from "./tabs/ClientsTab";
 import { EstimatesTab } from "./tabs/EstimatesTab";
 import { InvoicingTab } from "./tabs/InvoicingTab";
@@ -54,7 +54,16 @@ type TabId = (typeof TABS)[number]["id"] | typeof STAFF_TAB.id | typeof EMAIL_TA
 
 export default function AdminPage() {
   return (
-    <AuthGate title="Admin sign in" subtitle="GG HighTech staff only.">
+    <AuthGate
+      title="Admin sign in"
+      subtitle="GG HighTech staff only."
+      allowedRoles={STAFF_ROLES}
+      wrongRole={{
+        message: "That's a client account, and this page is for GG HighTech staff.",
+        href: "/portal",
+        linkLabel: "Go to your client dashboard",
+      }}
+    >
       {({ auth, onSessionExpired, onLogout }) => (
         <AdminDashboard auth={auth} onSessionExpired={onSessionExpired} onLogout={onLogout} />
       )}

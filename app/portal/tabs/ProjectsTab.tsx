@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { MilestoneOut, ProjectOut } from "@/lib/api";
+import { RecentWork, SiteLinks } from "@/components/RecentWork";
 
 const STATUS_LABELS: Record<string, string> = {
   PLANNED: "Planned",
@@ -74,6 +75,12 @@ export function ProjectsTab({
               <ProgressBar value={p.overall_progress} label={`${p.title} overall progress`} large />
             </div>
 
+            {(p.live_url || p.staging_url) && (
+              <div className="mt-4">
+                <SiteLinks project={p} />
+              </div>
+            )}
+
             {items.length > 0 && (
               <ul className="mt-6 grid gap-x-8 gap-y-4 sm:grid-cols-2">
                 {items.map((m) => (
@@ -92,6 +99,12 @@ export function ProjectsTab({
                   </li>
                 ))}
               </ul>
+            )}
+
+            {(p.recent_commits?.length ?? 0) > 0 && (
+              <div className="mt-6 border-t border-white/10 pt-5">
+                <RecentWork project={p} limit={3} />
+              </div>
             )}
 
             <Link

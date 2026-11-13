@@ -21,6 +21,7 @@ import {
   type StoredAuth,
 } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
+import { RecentWork, SiteLinks } from "@/components/RecentWork";
 import { StagingPreview } from "@/components/StagingPreview";
 
 const INVOICE_STATUS_STYLES: Record<string, string> = {
@@ -178,6 +179,9 @@ function ProjectDetail({ auth, onSessionExpired }: { auth: StoredAuth; onSession
           <p className="mt-1 text-sm text-zinc-400">
             {project.status} · {project.overall_progress}% complete
           </p>
+          <div className="mt-3">
+            <SiteLinks project={project} />
+          </div>
         </div>
         <span
           className={`rounded-full border px-3 py-1 text-xs ${
@@ -296,6 +300,11 @@ function ProjectDetail({ auth, onSessionExpired }: { auth: StoredAuth; onSession
         </div>
 
         <div className="glass-card rounded-2xl p-6">
+          {(project.recent_commits?.length ?? 0) > 0 && (
+            <div className="mb-6 border-b border-white/10 pb-6">
+              <RecentWork project={project} />
+            </div>
+          )}
           <h2 className="text-lg font-medium text-white">Team Updates</h2>
           <ul className="mt-4 space-y-4">
             {updates.map((u) => (
