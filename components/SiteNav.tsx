@@ -2,10 +2,25 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { signOut } from "@/components/AuthGate";
+import { dashboardPathFor } from "@/lib/api";
+import { useAuth } from "@/lib/useAuth";
 
 export function SiteNav() {
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+  // Signed in → "Dashboard" + "Log out" instead of "Login". Until
+  // localStorage has been read (`ready`), neither shows, so a signed-in
+  // user never sees "Login" flash.
+  const { auth, ready } = useAuth();
+
+  function handleLogout() {
+    signOut(auth);
+    setOpen(false);
+    router.push("/");
+  }
 
   const links = [
     { href: "/", label: "Home" },
@@ -44,9 +59,24 @@ export function SiteNav() {
         </div>
 
         <div className="hidden items-center gap-5 md:flex">
-          <Link href="/login" className="text-sm text-zinc-300 transition-colors hover:text-white">
-            Login
-          </Link>
+          {ready &&
+            (auth ? (
+              <>
+                <Link
+                  href={dashboardPathFor(auth.role)}
+                  className="text-sm text-zinc-300 transition-colors hover:text-white"
+                >
+                  Dashboard
+                </Link>
+                <button onClick={handleLogout} className="text-sm text-zinc-300 transition-colors hover:text-white">
+                  Log out
+                </button>
+              </>
+            ) : (
+              <Link href="/login" className="text-sm text-zinc-300 transition-colors hover:text-white">
+                Login
+              </Link>
+            ))}
           <Link
             href="/estimate"
             className="rounded-full bg-accent px-4 py-2 text-sm font-medium text-black transition-transform hover:scale-105"
@@ -77,9 +107,21 @@ export function SiteNav() {
                 {l.label}
               </Link>
             ))}
-            <Link href="/login" className="text-sm text-zinc-300" onClick={() => setOpen(false)}>
-              Login
-            </Link>
+            {ready &&
+              (auth ? (
+                <>
+                  <Link href={dashboardPathFor(auth.role)} className="text-sm text-zinc-300" onClick={() => setOpen(false)}>
+                    Dashboard
+                  </Link>
+                  <button onClick={handleLogout} className="text-left text-sm text-zinc-300">
+                    Log out
+                  </button>
+                </>
+              ) : (
+                <Link href="/login" className="text-sm text-zinc-300" onClick={() => setOpen(false)}>
+                  Login
+                </Link>
+              ))}
           </div>
         </div>
       )}

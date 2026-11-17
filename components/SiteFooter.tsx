@@ -9,8 +9,7 @@ const companyLinks = [
 ];
 
 const platformLinks = [
-  { href: "/portal", label: "Client Portal" },
-  { href: "/admin", label: "Admin" },
+  { href: "/login", label: "Client Login" },
 ];
 
 export function SiteFooter() {

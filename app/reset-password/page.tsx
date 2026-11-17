@@ -3,11 +3,8 @@
 import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ApiError, resetPassword, saveAuth } from "@/lib/api";
+import { ApiError, dashboardPathFor, resetPassword, saveAuth } from "@/lib/api";
 import { Input } from "@/components/LoginScreen";
-
-// Roles mirrored from backend-fastapi/app/models/user.py USER_ROLES.
-const CLIENT_ROLES = ["CLIENT_ADMIN", "CLIENT_VIEWER"];
 
 export default function ResetPasswordPage() {
   // useSearchParams needs a Suspense boundary in the App Router.
@@ -44,7 +41,7 @@ function ResetPasswordForm() {
     try {
       const res = await resetPassword(token, password);
       saveAuth({ token: res.access_token, role: res.role, email: res.email, full_name: res.full_name });
-      router.push(CLIENT_ROLES.includes(res.role) ? "/portal" : "/admin");
+      router.push(dashboardPathFor(res.role));
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Could not reach the API");
       setSubmitting(false);

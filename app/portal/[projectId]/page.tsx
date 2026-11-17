@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
+  CLIENT_ROLES,
   ApiError,
   approveMilestone,
   getProject,
@@ -21,6 +22,7 @@ import {
   type StoredAuth,
 } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
+import { DashboardBrand } from "@/components/SiteChrome";
 import { RecentWork, SiteLinks } from "@/components/RecentWork";
 import { StagingPreview } from "@/components/StagingPreview";
 
@@ -31,7 +33,7 @@ const INVOICE_STATUS_STYLES: Record<string, string> = {
 
 export default function PortalProjectPage() {
   return (
-    <AuthGate title="Client portal sign-in" subtitle="Sign in to view your project status.">
+    <AuthGate title="Client portal sign-in" subtitle="Sign in to view your project status." allowedRoles={CLIENT_ROLES}>
       {({ auth, onSessionExpired }) => <ProjectDetail auth={auth} onSessionExpired={onSessionExpired} />}
     </AuthGate>
   );
@@ -168,8 +170,9 @@ function ProjectDetail({ auth, onSessionExpired }: { auth: StoredAuth; onSession
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-16">
-      <Link href="/portal" className="text-xs text-zinc-500 hover:text-zinc-300">
+    <div className="mx-auto max-w-5xl px-6 py-8">
+      <DashboardBrand />
+      <Link href="/portal" className="mt-8 block text-xs text-zinc-500 hover:text-zinc-300">
         ← Dashboard
       </Link>
 

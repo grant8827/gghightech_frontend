@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { SiteNav } from "@/components/SiteNav";
 import { SiteFooter } from "@/components/SiteFooter";
 import { ContactWidget } from "@/components/ContactWidget";
+import { HideOnDashboard } from "@/components/SiteChrome";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,9 +29,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col bg-black text-white">
-        <SiteNav />
+        <HideOnDashboard>
+          <SiteNav />
+        </HideOnDashboard>
         <div className="flex flex-1 flex-col">{children}</div>
-        <SiteFooter />
+        <HideOnDashboard>
+          <SiteFooter />
+        </HideOnDashboard>
         <ContactWidget />
       </body>
     </html>

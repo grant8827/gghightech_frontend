@@ -3,15 +3,12 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AuthGate } from "@/components/AuthGate";
-import type { StoredAuth } from "@/lib/api";
-
-// Roles mirrored from backend-fastapi/app/models/user.py USER_ROLES.
-const CLIENT_ROLES = ["CLIENT_ADMIN", "CLIENT_VIEWER"];
+import { dashboardPathFor, type StoredAuth } from "@/lib/api";
 
 // Single entry point for both audiences: the nav just says "Login" (no
 // more separate "Client Portal" / "Admin" links giving away that a staff
 // area exists). AuthGate handles the actual sign-in; this page's only job
-// is routing the signed-in user to the right place afterward — and doing
+// is routing the signed-in user to their dashboard afterward — and doing
 // the same immediately if they already have a stored session, so
 // revisiting /login while signed in skips the form entirely.
 export default function LoginPage() {
@@ -26,7 +23,7 @@ function RoleRedirect({ auth }: { auth: StoredAuth }) {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace(CLIENT_ROLES.includes(auth.role) ? "/portal" : "/admin");
+    router.replace(dashboardPathFor(auth.role));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [auth.role]);
 

@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import {
+  CLIENT_ROLES,
   ApiError,
   listContracts,
   listInvoices,
@@ -15,6 +16,7 @@ import {
   type StoredAuth,
 } from "@/lib/api";
 import { AuthGate } from "@/components/AuthGate";
+import { DashboardBrand } from "@/components/SiteChrome";
 import { ContractsTab } from "./tabs/ContractsTab";
 import { PaymentsTab, type PaymentsView } from "./tabs/PaymentsTab";
 import { ProjectsTab } from "./tabs/ProjectsTab";
@@ -29,7 +31,11 @@ type TabId = (typeof TABS)[number]["id"];
 
 export default function PortalPage() {
   return (
-    <AuthGate title="Client portal sign-in" subtitle="Sign in to view your projects and payments.">
+    <AuthGate
+      title="Client portal sign-in"
+      subtitle="Sign in to view your projects and payments."
+      allowedRoles={CLIENT_ROLES}
+    >
       {({ auth, onSessionExpired, onLogout }) => (
         // useSearchParams (below) needs a Suspense boundary — see
         // node_modules/next/dist/docs/01-app/03-api-reference/04-functions/use-search-params.md
@@ -124,8 +130,9 @@ function ClientDashboard({
   const toSignCount = contracts.filter((c) => c.status === "SENT").length;
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-16">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mx-auto max-w-5xl px-6 py-8">
+      <DashboardBrand />
+      <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-white">Client dashboard</h1>
           <p className="mt-1 text-sm text-zinc-400">Track your projects, pay invoices, download receipts and sign contracts.</p>

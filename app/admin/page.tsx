@@ -19,6 +19,7 @@ import {
   type StoredAuth,
 } from "@/lib/api";
 import { AuthGate, STAFF_ROLES } from "@/components/AuthGate";
+import { DashboardBrand } from "@/components/SiteChrome";
 import { isNewlySigned, markSignedSeen, signedSeenAt } from "@/lib/signedContracts";
 import { ClientsTab } from "./tabs/ClientsTab";
 import { EstimatesTab } from "./tabs/EstimatesTab";
@@ -61,11 +62,6 @@ export default function AdminPage() {
       title="Admin sign in"
       subtitle="GG HighTech staff only."
       allowedRoles={STAFF_ROLES}
-      wrongRole={{
-        message: "That's a client account, and this page is for GG HighTech staff.",
-        href: "/portal",
-        linkLabel: "Go to your client dashboard",
-      }}
     >
       {({ auth, onSessionExpired, onLogout }) => (
         <AdminDashboard auth={auth} onSessionExpired={onSessionExpired} onLogout={onLogout} />
@@ -84,6 +80,20 @@ function AdminDashboard({
   onLogout: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<TabId>("overview");
+  // Phones: the sidebar is a slide-in drawer opened from the top bar.
+  const [menuOpen, setMenuOpen] = useState(false);
+  function selectTab(id: TabId) {
+    setActiveTab(id);
+    setMenuOpen(false);
+  }
+  const activeLabel = [...TABS, STAFF_TAB, EMAIL_TAB].find((t) => t.id === activeTab)?.label ?? "";
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setMenuOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [menuOpen]);
   const [orgs, setOrgs] = useState<OrganizationOut[]>([]);
   const [projects, setProjects] = useState<ProjectOut[]>([]);
   const [estimates, setEstimates] = useState<EstimateOut[]>([]);
@@ -99,6 +109,7 @@ function AdminDashboard({
   // Contracts signed since this browser last opened Invoicing / Contracts →
   // Contracts. Badge on that tab; see lib/signedContracts.ts.
   const [newlySigned, setNewlySigned] = useState(0);
+  const badgeTotal = unreadMessages + newlySigned;
 
   function handleError(e: unknown, fallback: string) {
     if (e instanceof ApiError) {
@@ -203,16 +214,60 @@ function AdminDashboard({
   }
 
   return (
-    <div className="flex">
-      <aside className="sticky top-0 h-screen w-56 shrink-0 overflow-y-auto border-r border-white/10 px-6 py-16">
-        <h1 className="text-2xl font-semibold text-white">Back-Office</h1>
+    <div className="md:flex">
+      {/* Phone top bar: brand, current section, menu button. */}
+      <div className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-white/10 bg-black/80 px-4 py-3 backdrop-blur md:hidden">
+        <DashboardBrand />
+        <button
+          onClick={() => setMenuOpen(true)}
+          aria-expanded={menuOpen}
+          aria-controls="admin-sidebar"
+          className="flex min-w-0 items-center gap-2 rounded-full border border-white/15 px-3 py-1.5 text-sm text-zinc-200"
+        >
+          <span className="truncate">{activeLabel}</span>
+          {badgeTotal > 0 && (
+            <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold leading-none text-black">
+              {badgeTotal}
+              <span className="sr-only"> new</span>
+            </span>
+          )}
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+            <path d="M4 6h16M4 12h16M4 18h16" strokeLinecap="round" />
+          </svg>
+          <span className="sr-only">Open menu</span>
+        </button>
+      </div>
+
+      {menuOpen && (
+        <div className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm md:hidden" onClick={() => setMenuOpen(false)} aria-hidden="true" />
+      )}
+
+      <aside
+        id="admin-sidebar"
+        className={`fixed inset-y-0 left-0 z-50 w-64 overflow-y-auto border-r border-white/10 bg-black px-6 py-8 transition-transform duration-200 md:sticky md:top-0 md:z-auto md:h-screen md:w-56 md:shrink-0 md:translate-x-0 ${
+          menuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between">
+          <DashboardBrand />
+          <button
+            onClick={() => setMenuOpen(false)}
+            className="rounded-full p-1 text-zinc-400 hover:text-white md:hidden"
+            aria-label="Close menu"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+        <h1 className="mt-8 text-2xl font-semibold text-white">Back-Office</h1>
         <p className="mt-1 text-xs text-zinc-500">Complete control over clients, delivery, and billing.</p>
 
         <nav className="mt-6 flex flex-col gap-1">
           {TABS.filter((tab) => tab.id !== "messages" || canReadMessages).map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => selectTab(tab.id)}
               className={`flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                 activeTab === tab.id
                   ? "bg-accent/15 text-accent-light"
@@ -239,7 +294,7 @@ function AdminDashboard({
           ))}
           {isSuperAdmin && (
             <button
-              onClick={() => setActiveTab(EMAIL_TAB.id)}
+              onClick={() => selectTab(EMAIL_TAB.id)}
               className={`rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                 activeTab === EMAIL_TAB.id
                   ? "bg-accent/15 text-accent-light"
@@ -256,7 +311,7 @@ function AdminDashboard({
             {auth.full_name} · {auth.role}
           </span>
           <button
-            onClick={() => setActiveTab(STAFF_TAB.id)}
+            onClick={() => selectTab(STAFF_TAB.id)}
             className={`w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
               activeTab === STAFF_TAB.id
                 ? "bg-accent/15 text-accent-light"
@@ -274,7 +329,7 @@ function AdminDashboard({
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 px-6 py-16">
+      <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 md:py-10">
         <div className="max-w-5xl">
           {error && (
             <p className="mb-6 rounded-lg border border-red-400/30 bg-red-400/10 p-3 text-sm text-red-300">

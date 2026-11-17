@@ -91,21 +91,61 @@ export const resetPassword = (token: string, password: string) =>
 export const logout = (token: string) =>
   request<void>("/api/v1/auth/logout", { method: "POST", token });
 
+// Roles mirrored from backend-fastapi/app/models/user.py USER_ROLES. The
+// backend enforces every permission itself (role read from the database on
+// each request); these only decide which dashboard the UI shows.
+export const CLIENT_ROLES = ["CLIENT_ADMIN", "CLIENT_VIEWER"];
+export const STAFF_ROLES = ["SUPER_ADMIN", "PROJECT_MANAGER", "LEAD_ENGINEER"];
+export const isClientRole = (role: string) => CLIENT_ROLES.includes(role);
+export const dashboardPathFor = (role: string) => (isClientRole(role) ? "/portal" : "/admin");
+
+// Fired on this tab whenever the stored session changes, so the nav and the
+// dashboards stay in sync (other tabs get the native "storage" event).
+const AUTH_EVENT = "gghightech-auth-change";
+
 export function saveAuth(auth: StoredAuth): void {
   try {
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(auth));
   } catch {
     // localStorage unavailable (private mode, etc.) — session just won't persist across reloads.
   }
+  window.dispatchEvent(new Event(AUTH_EVENT));
 }
 
-export function loadAuth(): StoredAuth | null {
+// Seconds-since-epoch expiry from the JWT payload, or null if unreadable.
+// Only used to forget a dead session early; the server still verifies.
+function tokenExpiry(token: string): number | null {
   try {
-    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as StoredAuth) : null;
+    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof payload.exp === "number" ? payload.exp : null;
   } catch {
     return null;
   }
+}
+
+function readAuthRaw(): string | null {
+  try {
+    return localStorage.getItem(AUTH_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function parseAuth(raw: string | null): StoredAuth | null {
+  if (!raw) return null;
+  try {
+    const auth = JSON.parse(raw) as StoredAuth;
+    if (!auth?.token || !auth.role) return null;
+    const exp = tokenExpiry(auth.token);
+    if (exp !== null && exp * 1000 <= Date.now()) return null; // expired
+    return auth;
+  } catch {
+    return null;
+  }
+}
+
+export function loadAuth(): StoredAuth | null {
+  return parseAuth(readAuthRaw());
 }
 
 export function clearAuth(): void {
@@ -114,7 +154,28 @@ export function clearAuth(): void {
   } catch {
     // nothing to clean up
   }
+  window.dispatchEvent(new Event(AUTH_EVENT));
 }
+
+// For useSyncExternalStore (see lib/useAuth.ts): the raw string is a stable
+// snapshot; callers parse it.
+export function subscribeAuth(onChange: () => void): () => void {
+  const onStorage = (e: StorageEvent) => {
+    if (e.key === null || e.key === AUTH_STORAGE_KEY) onChange();
+  };
+  window.addEventListener(AUTH_EVENT, onChange);
+  window.addEventListener("storage", onStorage);
+  return () => {
+    window.removeEventListener(AUTH_EVENT, onChange);
+    window.removeEventListener("storage", onStorage);
+  };
+}
+export const authSnapshot = readAuthRaw;
+export const parseStoredAuth = parseAuth;
+
+// Confirms the stored token is still valid server-side (not revoked, user
+// not deleted) and returns the account's *current* role.
+export const getMe = (token: string) => request<{ email: string; role: string }>("/api/v1/auth/me", { token });
 
 // ---- Estimates (GGH-201 / GGH-202) ----
 

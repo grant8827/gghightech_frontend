@@ -37,6 +37,10 @@ export function LoginScreen({
 
   return (
     <div className="mx-auto flex max-w-sm flex-col justify-center px-6 py-24">
+      {/* The dashboards hide the site nav, so give a way back. */}
+      <Link href="/" className="mb-8 text-xs text-zinc-500 hover:text-zinc-300">
+        ← Back to website
+      </Link>
       <h1 className="text-2xl font-semibold text-white">{title}</h1>
       <p className="mt-1 text-sm text-zinc-400">{subtitle}</p>
 
